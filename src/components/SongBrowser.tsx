@@ -29,7 +29,7 @@ export function SongBrowser({ songs }: { songs: SongSummary[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="sticky top-14 z-10 -mx-4 flex flex-col gap-2 border-b border-border bg-bg/90 px-4 py-3 backdrop-blur sm:flex-row sm:items-center">
+      <div className="sticky top-16 z-10 -mx-4 flex flex-col gap-2 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center">
         <label className="relative flex-1">
           <span className="sr-only">Tìm bài</span>
           <svg viewBox="0 0 20 20" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden>
@@ -40,7 +40,7 @@ export function SongBrowser({ songs }: { songs: SongSummary[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Tìm bài, tác giả, phiên bản… (gõ không dấu cũng được)"
-            className="h-10 w-full rounded-lg border border-border bg-surface pr-3 pl-9 text-sm outline-none placeholder:text-muted focus:border-accent"
+            className="h-11 w-full rounded-lg border border-border bg-surface pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent"
           />
         </label>
         <div className="flex items-center gap-2">
@@ -48,8 +48,8 @@ export function SongBrowser({ songs }: { songs: SongSummary[] }) {
             type="button"
             onClick={() => setAudioOnly((v) => !v)}
             aria-pressed={audioOnly}
-            className={`h-10 rounded-lg border px-3 text-sm transition-colors ${
-              audioOnly ? "border-accent bg-accent/15 text-accent" : "border-border bg-surface text-muted hover:text-text"
+            className={`h-11 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+              audioOnly ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface text-soft hover:border-muted"
             }`}
           >
             Có audio
@@ -58,7 +58,7 @@ export function SongBrowser({ songs }: { songs: SongSummary[] }) {
             value={sort}
             onChange={(e) => setSort(e.target.value as Sort)}
             aria-label="Sắp xếp"
-            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm outline-none focus:border-accent"
+            className="h-11 rounded-lg border border-border bg-surface px-2 text-sm font-medium text-soft outline-none focus:border-accent"
           >
             <option value="az">Tên A → Z</option>
             <option value="za">Tên Z → A</option>

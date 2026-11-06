@@ -1,14 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
+import { Chakra_Petch, JetBrains_Mono, Zalando_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { site } from "@/config/site";
 import "./globals.css";
 
-const beVietnam = Be_Vietnam_Pro({
-  variable: "--font-be-vietnam",
+const zalando = Zalando_Sans({
+  variable: "--font-zalando",
   subsets: ["latin", "vietnamese"],
-  weight: ["400", "500", "600", "700"],
+});
+
+const chakra = Chakra_Petch({
+  variable: "--font-chakra",
+  subsets: ["latin", "vietnamese"],
+  weight: ["500", "600", "700"],
 });
 
 const jetbrains = JetBrains_Mono({
@@ -22,12 +27,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e1014",
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="vi" className={`${beVietnam.variable} ${jetbrains.variable} h-full antialiased`}>
+    <html lang="vi" className={`${zalando.variable} ${chakra.variable} ${jetbrains.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
         <SiteHeader />
         <main className="flex-1">{children}</main>

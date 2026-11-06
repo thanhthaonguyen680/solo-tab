@@ -3,6 +3,11 @@ export const site = {
   tagline: "Kho tab guitar solo & melody",
   description:
     "Tab guitar solo và melody, có audio mẫu, cập nhật mỗi tuần.",
+  /**
+   * Bật/tắt gói thành viên. Khi tắt: mọi bài đều mở, ẩn nút Đăng ký, giá, nhãn "Miễn phí"
+   * và trang /goi. Bật lại (true) khi đã có đăng nhập + thanh toán.
+   */
+  membership: false as boolean,
   // TODO: thay bằng giá và kênh liên hệ thật
   pricePerMonth: 25000,
   contact: {

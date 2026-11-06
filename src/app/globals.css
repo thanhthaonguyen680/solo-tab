@@ -1,15 +1,20 @@
 @import "tailwindcss";
 
+/* Theme tối: nền gần đen, nhấn xanh chanh, viền mảnh */
 :root {
-  --bg: #0e1014;
-  --surface: #161920;
-  --surface-2: #1d2129;
-  --border: #2a2f3a;
-  --text: #ede8de;
-  --muted: #979dab;
-  --accent: #ff8a3d;
-  --accent-fg: #1c0f04;
-  --fresh: #7fd6a9;
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface-2: #1c1c1c;
+  --border: #2f2f2f; /* viền thẻ, ô nhập, nút phụ */
+  --line: #222222; /* đường kẻ phụ, nhạt hơn */
+  --text: #fafafa;
+  --soft: #d4d4d4; /* chữ trên nút phụ, menu */
+  --muted: #a3a3a3;
+  --accent: #93d900;
+  --accent-hover: #a6ec12;
+  --accent-fg: #0a0a0a;
+  --accent-ink: #9be010; /* chữ xanh chanh trên nền tối */
+  --fresh: #1a2700; /* nền xanh rêu cho nhãn "Mới", thông báo thành công */
   color-scheme: dark;
 }
 
@@ -18,12 +23,17 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-line: var(--line);
   --color-text: var(--text);
+  --color-soft: var(--soft);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-ink: var(--accent-ink);
   --color-fresh: var(--fresh);
-  --font-sans: var(--font-be-vietnam), system-ui, sans-serif;
+  --font-sans: var(--font-zalando), system-ui, sans-serif;
+  --font-display: var(--font-chakra), var(--font-zalando), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
@@ -32,10 +42,37 @@ body {
   color: var(--text);
 }
 
-/* Sáu dây đàn chạy ngang, mờ dần về bên trái để không đè lên chữ */
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+/* Ánh sáng xanh quanh nút chính */
+@utility glow {
+  box-shadow: 0 0 22px -4px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+
+/* Nhãn nhỏ viết hoa phía trên tiêu đề mục */
+@utility eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+/* Chữ nhấn trong tiêu đề */
+@utility highlight {
+  color: var(--accent-ink);
+}
+
+/* Sáu dây đàn chạy ngang ở nửa phải hero + quầng sáng xanh */
 .strings {
   position: relative;
   isolation: isolate;
+  overflow: hidden;
 }
 .strings::before {
   content: "";
@@ -44,16 +81,44 @@ body {
   z-index: -1;
   background-image: repeating-linear-gradient(
     to bottom,
-    color-mix(in oklab, var(--text) 14%, transparent) 0 1px,
+    color-mix(in oklab, var(--text) 16%, transparent) 0 1px,
     transparent 1px 18px
   );
-  background-size: 100% 91px;
+  background-size: 100% 92px;
   background-repeat: repeat-x;
   background-position: 0 50%;
-  mask-image: linear-gradient(to right, transparent 35%, black 85%);
+  mask-image: linear-gradient(to right, transparent 40%, black 85%);
+}
+.strings::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  right: -10%;
+  bottom: -60%;
+  width: 70%;
+  height: 120%;
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 22%, transparent), transparent);
+  pointer-events: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 ::selection {
   background: var(--accent);
   color: var(--accent-fg);
+}
+
+/* Watermark chìm phủ lên ảnh sheet (ảnh nền trắng) */
+.sheet-watermark {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='190'%3E%3Ctext x='150' y='95' text-anchor='middle' dominant-baseline='middle' transform='rotate(-24 150 95)' font-family='system-ui,sans-serif' font-size='22' font-weight='700' fill='%23111' fill-opacity='0.09'%3Esolo.tab%3C/text%3E%3C/svg%3E");
+  background-size: 300px 190px;
+  -webkit-touch-callout: none;
+}
+
+/* 5 dòng kẻ khuông nhạc — dùng cho sheet giả khi bài bị khoá */
+.sheet-staff {
+  background-image: repeating-linear-gradient(to bottom, #c9c4bb 0 1px, transparent 1px 14px);
 }

@@ -1,25 +1,7 @@
-import type { CollectionSlug } from "@/config/site";
+import type { Song } from "../lib/song-model.ts";
 
-export type Song = {
-  slug: string;
-  title: string;
-  artist?: string;
-  collection: CollectionSlug;
-  /** Các phiên bản / phần của bài: "Intro", "Ver. 2", ... */
-  tags: string[];
-  /** Ngày thêm bài (YYYY-MM-DD) — dùng để sắp xếp và gắn nhãn "Mới" */
-  addedAt: string;
-  level: "Dễ" | "Vừa" | "Khó";
-  key?: string;
-  bpm?: number;
-  audioUrl?: string;
-  /** Bài mở miễn phí cho mọi người xem */
-  free?: boolean;
-  /** Tab dạng ASCII. Khi có kho thật, thay bằng sheet/ảnh/PDF. */
-  tab?: string;
-};
-
-// Dữ liệu MẪU để dựng giao diện — toàn bộ là dân ca / nhạc cổ điển phổ biến.
+// Dữ liệu MẪU — chỉ dùng để nạp vào database lần đầu (npm run db:setup); app đọc bài từ database.
+// Toàn bộ là dân ca / nhạc cổ điển phổ biến.
 // Tab bên dưới chỉ là bài tập minh hoạ, không phải bản chuyển soạn của bài.
 const DEMO_TAB = `e|-----------------5-8-----------------|
 B|-------------5-8-------8-5-------------|

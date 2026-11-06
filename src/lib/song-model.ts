@@ -1,0 +1,132 @@
+import { collections, type CollectionSlug } from "@/config/site";
+
+export const LEVELS = ["Dễ", "Vừa", "Khó"] as const;
+export type Level = (typeof LEVELS)[number];
+
+export type Song = {
+  slug: string;
+  title: string;
+  artist?: string;
+  collection: CollectionSlug;
+  /** Các phiên bản / phần của bài: "Intro", "Ver. 2", ... */
+  tags: string[];
+  /** Ngày thêm bài (YYYY-MM-DD) — dùng để sắp xếp và gắn nhãn "Mới" */
+  addedAt: string;
+  level: Level;
+  key?: string;
+  bpm?: number;
+  audioUrl?: string;
+  /** Bài mở miễn phí cho mọi người xem */
+  free?: boolean;
+  /** Tab dạng ASCII */
+  tab?: string;
+  /** Sheet PDF đã chuyển thành ảnh: phiên bản đang dùng và kích thước từng trang */
+  sheet?: Sheet;
+};
+
+export type Sheet = {
+  version: string;
+  pages: { width: number; height: number }[];
+};
+
+/** Giới hạn cho sheet PDF */
+export const SHEET_LIMITS = {
+  maxPages: 30,
+  /** Mỗi ảnh trang — dưới giới hạn 4,5 MB/request của Vercel */
+  maxPageBytes: 3.5 * 1024 * 1024,
+  contentTypes: ["image/webp", "image/jpeg", "image/png"] as const,
+};
+
+export const SHEET_VERSION_PATTERN = /^[a-f0-9-]{36}$/;
+
+export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** "Bèo dạt mây trôi" → "beo-dat-may-troi" */
+export function slugify(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export type SongFieldErrors = Partial<Record<keyof Song, string>>;
+
+export type ParsedSong = { ok: true; song: Song } | { ok: false; errors: SongFieldErrors };
+
+function text(form: FormData, name: string) {
+  const v = form.get(name);
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** Đọc và kiểm tra dữ liệu form admin. Dùng ở server — không tin dữ liệu từ client. */
+export function parseSongForm(form: FormData): ParsedSong {
+  const errors: SongFieldErrors = {};
+
+  const title = text(form, "title");
+  if (!title) errors.title = "Nhập tên bài";
+  else if (title.length > 200) errors.title = "Tên bài tối đa 200 ký tự";
+
+  const slug = text(form, "slug") || slugify(title);
+  if (!SLUG_PATTERN.test(slug)) errors.slug = "Chỉ dùng chữ thường không dấu, số và dấu gạch ngang";
+
+  const collection = text(form, "collection");
+  if (!Object.hasOwn(collections, collection)) errors.collection = "Chọn kho bài";
+
+  const level = text(form, "level");
+  if (!(LEVELS as readonly string[]).includes(level)) errors.level = "Chọn độ khó";
+
+  const bpmRaw = text(form, "bpm");
+  const bpm = bpmRaw ? Number(bpmRaw) : undefined;
+  if (bpm !== undefined && !(Number.isInteger(bpm) && bpm >= 20 && bpm <= 400)) {
+    errors.bpm = "Tempo là số nguyên từ 20 đến 400";
+  }
+
+  const addedAt = text(form, "addedAt") || new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(addedAt) || Number.isNaN(Date.parse(addedAt))) {
+    errors.addedAt = "Ngày không hợp lệ";
+  }
+
+  const audioUrl = text(form, "audioUrl");
+  if (audioUrl && !/^(https:\/\/|\/)/.test(audioUrl)) {
+    errors.audioUrl = "Link audio phải bắt đầu bằng https:// hoặc /";
+  }
+
+  const tags = [
+    ...new Set(
+      text(form, "tags")
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (tags.length > 12) errors.tags = "Tối đa 12 tag";
+
+  // Giữ nguyên khoảng trắng đầu dòng của tab, chỉ bỏ dòng trống thừa ở đầu/cuối
+  const rawTab = form.get("tab");
+  const tab = typeof rawTab === "string" ? rawTab.replace(/\r\n/g, "\n").replace(/^\n+|\s+$/g, "") : "";
+  if (tab.length > 50_000) errors.tab = "Tab quá dài (tối đa 50.000 ký tự)";
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  return {
+    ok: true,
+    song: {
+      slug,
+      title,
+      artist: text(form, "artist") || undefined,
+      collection: collection as CollectionSlug,
+      tags,
+      addedAt,
+      level: level as Level,
+      key: text(form, "key") || undefined,
+      bpm,
+      audioUrl: audioUrl || undefined,
+      free: form.get("free") === "on",
+      tab: tab || undefined,
+    },
+  };
+}
