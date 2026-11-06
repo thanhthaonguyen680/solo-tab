@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# solo.tab
 
-## Getting Started
+Kho tab guitar **solo** & **melody** — Next.js 16 (App Router) + TypeScript + Tailwind CSS v4.
 
-First, run the development server:
+## Chạy local
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # kiểm tra build production
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Cấu trúc
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Đường dẫn | Nội dung |
+| --- | --- |
+| `src/app/page.tsx` | Trang chủ: hero, 2 bộ sưu tập, bài mới cập nhật |
+| `src/app/[collection]/page.tsx` | `/solo`, `/melody` — danh sách bài, tìm kiếm, lọc, sắp xếp |
+| `src/app/bai/[slug]/page.tsx` | Trang chi tiết bài: thông tin, audio mẫu, tab (khoá nếu chưa là thành viên) |
+| `src/app/goi/page.tsx` | Trang gói thành viên |
+| `src/config/site.ts` | Tên site, giá gói, kênh liên hệ, danh sách bộ sưu tập |
+| `src/data/songs.ts` | Dữ liệu bài hát (**hiện là dữ liệu mẫu**) |
+| `src/lib/songs.ts` | Hàm truy vấn bài; `SongSummary` gửi xuống client không kèm tab/audio |
+| `src/lib/search.ts` | Tìm kiếm không dấu tiếng Việt |
+| `src/lib/access.ts` | `canViewSong()` — chỗ duy nhất quyết định ai được xem bài |
+| `src/components/` | Header, footer, logo, thẻ bài, bộ lọc/tìm kiếm |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Thêm bài
 
-## Learn More
+Thêm một object vào `songs` trong `src/data/songs.ts`. Nhãn **Mới** tự gắn cho 4 bài có `addedAt` gần nhất; `free: true` mở bài cho mọi người.
 
-To learn more about Next.js, take a look at the following resources:
+## Dữ liệu mẫu
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Các bài hiện có là dân ca / nhạc cổ điển phổ biến, dùng để dựng giao diện. Tab là bài tập minh hoạ (không phải bản chuyển soạn), `public/audio/demo.wav` là âm thanh tổng hợp bằng thuật toán Karplus–Strong.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Việc tiếp theo
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [ ] Đăng nhập (vd. Auth.js / Neon Auth) và lưu gói thành viên trong Postgres
+- [ ] Thanh toán (VietQR / PayOS / Momo) → cập nhật hạn gói; nối vào `canViewSong()`
+- [ ] Chuyển `src/data/songs.ts` sang database + trang admin để upload sheet (ảnh/PDF) và audio
+- [ ] Phục vụ sheet/audio trả phí qua URL có ký (signed URL) thay vì `public/`
+- [ ] Form yêu cầu bài
+- [ ] Deploy (Vercel)
