@@ -20,10 +20,12 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 
 ### 🛠 Trang quản trị gọn nhẹ
 - Thêm, sửa, xoá bài; đặt độ khó, tông, tempo mặc định cho từng bài.
+- **Sửa tab trực quan ngay trong admin:** bấm vào nốt trên tab rồi dùng bàn phím để đổi phím, dây, trường độ, thêm/xoá nốt, bật tiếng đập “xx”, luyến, ngân; nghe thử ngay, hoàn tác/làm lại, cảnh báo ô thiếu/thừa phách.
 - Sửa xong là site cập nhật ngay, không cần deploy lại.
 
 ### 📱 Dùng tốt trên điện thoại
 - Giao diện tối, gọn trên màn hình nhỏ; thanh điều khiển luôn nằm trong tầm tay khi cuộn.
+- **Chế độ cuộn ngang:** bản nhạc trôi mượt dưới con trỏ, trang không giật khi đang phát.
 - Trên iPhone vẫn nghe được tiếng kể cả khi máy đang để chế độ im lặng.
 - Lưu ra màn hình chính như một app, có icon riêng.
 

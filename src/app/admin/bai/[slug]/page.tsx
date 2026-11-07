@@ -7,6 +7,7 @@ import { SongForm } from "../../SongForm";
 import { DeleteSongButton } from "./DeleteSongButton";
 import { isFileNotation } from "@/lib/notation-format";
 import { SheetUploader } from "./SheetUploader";
+import { TabEditorLauncher } from "./TabEditorLauncher";
 
 export const metadata: Metadata = { title: "Sửa bài" };
 
@@ -40,6 +41,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
         sheet={song.sheet}
         notationSource={song.notation ? (isFileNotation(song.notation) ? "file" : "pdf") : null}
       />
+      {song.notation && <TabEditorLauncher key={song.notation.length} slug={song.slug} notation={song.notation} />}
       <SongForm song={song} today={song.addedAt} action={saveSong.bind(null, song.slug)} />
     </div>
   );

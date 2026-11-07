@@ -42,3 +42,14 @@ next-env.d.ts
 
 # alphaTab assets (chép từ node_modules khi npm install)
 /public/alphatab/
+
+# File media / tab nguồn đặt tạm trong dự án — không commit
+*.mp4
+*.mov
+*.m4a
+*.wav
+*.gp
+*.gp3
+*.gp4
+*.gp5
+*.gpx

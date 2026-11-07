@@ -20,7 +20,22 @@ type Status =
  */
 export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultBpm?: number }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<AlphaTabApi | null>(null);
+  /**
+   * Kiểu hiển thị. "auto": điện thoại dùng cuộn ngang (bản nhạc trôi mượt dưới con trỏ, trang không giật),
+   * màn hình lớn dùng kiểu trang. Người xem bấm nút để đổi.
+   */
+  const [layoutChoice, setLayoutChoice] = useState<"auto" | "page" | "horizontal">("auto");
+  const [horizontal, setHorizontal] = useState(false);
+  /** Lựa chọn của người xem — giữ lại khi trình phát được tạo lại (đổi kiểu hiển thị) */
+  const prefsRef = useRef<{ bpm: number | null; loop: boolean; metronome: boolean; countIn: boolean }>({
+    bpm: null,
+    loop: false,
+    metronome: false,
+    countIn: false,
+  });
   const [status, setStatus] = useState<Status>({ kind: "loading", label: "Đang vẽ tab…" });
   const [playerReady, setPlayerReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -48,6 +63,13 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
     (async () => {
       const alphaTab = await import("@coderline/alphatab");
       if (cancelled) return;
+      const isHorizontal =
+        layoutChoice === "horizontal" || (layoutChoice === "auto" && window.matchMedia("(max-width: 640px)").matches);
+      setHorizontal(isHorizontal);
+      setPlayerReady(false);
+      setPlaying(false);
+      setStatus({ kind: "loading", label: "Đang vẽ tab…" });
+      const scroller = scrollRef.current;
       const css = getComputedStyle(document.documentElement);
       const color = (name: string) => css.getPropertyValue(name).trim();
       api = new alphaTab.AlphaTabApi(host, {
@@ -56,8 +78,8 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           scriptFile: "/alphatab/alphaTab.mjs",
         },
         display: {
-          layoutMode: alphaTab.LayoutMode.Page,
-          scale: 0.95,
+          layoutMode: isHorizontal ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page,
+          scale: isHorizontal ? 0.85 : 0.95,
           resources: {
             mainGlyphColor: color("--text"),
             secondaryGlyphColor: color("--muted"),
@@ -70,17 +92,33 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
         player: {
           playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
           soundFont: "/alphatab/soundfont/sonivox.sf2",
-          scrollOffsetY: -150, // chừa chỗ cho header + thanh điều khiển dính trên cùng
+          ...(isHorizontal && scroller
+            ? {
+                // Cuộn ngang liên tục và mượt trong khung tab; con trỏ đứng cách mép trái ~1/4 khung
+                scrollMode: alphaTab.ScrollMode.Smooth,
+                scrollElement: scroller,
+                scrollOffsetX: -Math.round(scroller.clientWidth * 0.25),
+              }
+            : {
+                scrollMode: alphaTab.ScrollMode.Continuous,
+                scrollOffsetY: -150, // chừa chỗ cho header + thanh điều khiển dính trên cùng
+              }),
         },
       });
       apiRef.current = api;
 
       api.scoreLoaded.on((score) => {
         const start = defaultBpm ?? score.tempo;
+        const current = prefsRef.current.bpm ?? start;
         setBaseBpm(score.tempo);
         setStartBpm(start);
-        setBpm(start);
-        if (api) api.playbackSpeed = start / score.tempo;
+        setBpm(current);
+        if (api) {
+          api.playbackSpeed = current / score.tempo;
+          api.isLooping = prefsRef.current.loop;
+          api.metronomeVolume = prefsRef.current.metronome ? 1 : 0;
+          api.countInVolume = prefsRef.current.countIn ? 1 : 0;
+        }
       });
       api.renderFinished.on(() => setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: "Đang tải tiếng đàn…" } : s)));
       api.soundFontLoad.on((e) => {
@@ -121,7 +159,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
         silentAudioRef.current = null;
       }
     };
-  }, [notation, defaultBpm]);
+  }, [notation, defaultBpm, layoutChoice]);
 
   function togglePlay() {
     const api = apiRef.current;
@@ -131,6 +169,16 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
       silentAudioRef.current ??= createSilentAudio();
       silentAudioRef.current.play().catch(() => {});
     }
+    // Cuộn ngang: trang đứng yên khi phát, nên đưa khung tab vào tầm nhìn một lần lúc bắt đầu
+    const scroller = scrollRef.current;
+    const controls = controlsRef.current;
+    if (horizontal && !playing && scroller && controls) {
+      const top = 64 + controls.offsetHeight + 8; // header (64px) + thanh điều khiển dính
+      const rect = scroller.getBoundingClientRect();
+      if (rect.top < top || rect.bottom > window.innerHeight) {
+        window.scrollBy({ top: rect.top - top, behavior: "smooth" });
+      }
+    }
     api.playPause();
   }
 
@@ -138,30 +186,37 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
     if (!baseBpm) return;
     const v = Math.min(BPM_MAX, Math.max(BPM_MIN, next));
     setBpm(v);
+    prefsRef.current.bpm = v;
     if (apiRef.current) apiRef.current.playbackSpeed = v / baseBpm;
   }
   function toggleLoop(v: boolean) {
     setLoop(v);
+    prefsRef.current.loop = v;
     if (apiRef.current) apiRef.current.isLooping = v;
   }
   function toggleMetronome(v: boolean) {
     setMetronome(v);
+    prefsRef.current.metronome = v;
     if (apiRef.current) apiRef.current.metronomeVolume = v ? 1 : 0;
   }
   function toggleCountIn(v: boolean) {
     setCountIn(v);
+    prefsRef.current.countIn = v;
     if (apiRef.current) apiRef.current.countInVolume = v ? 1 : 0;
   }
 
   return (
     <section className="flex flex-col gap-3" aria-label="Tab tương tác">
-      <div className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 backdrop-blur-md">
+      <div
+        ref={controlsRef}
+        className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 backdrop-blur-md"
+      >
         <button
           type="button"
           onClick={togglePlay}
           disabled={!playerReady}
           aria-label={playing ? "Tạm dừng" : "Phát"}
-          className="glow grid size-11 place-items-center rounded-lg bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-50 disabled:shadow-none"
+          className="glow grid size-10 place-items-center rounded-lg sm:size-11 bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-50 disabled:shadow-none"
         >
           {playing ? (
             <svg viewBox="0 0 16 16" className="size-4" aria-hidden>
@@ -178,25 +233,25 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           onClick={() => apiRef.current?.stop()}
           disabled={!playerReady}
           aria-label="Về đầu bài"
-          className="grid size-11 place-items-center rounded-lg border border-border text-soft transition-colors hover:border-muted hover:text-text disabled:opacity-50"
+          className="grid size-10 place-items-center rounded-lg sm:size-11 border border-border text-soft transition-colors hover:border-muted hover:text-text disabled:opacity-50"
         >
           <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
             <path fill="currentColor" d="M3 3h10v10H3z" />
           </svg>
         </button>
 
-        <span className="min-w-[88px] font-mono text-xs text-muted tabular-nums">
+        <span className="font-mono text-xs text-muted tabular-nums sm:min-w-[88px]">
           {formatTime(time.current)} / {formatTime(time.end)}
         </span>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex items-center">
           <div role="group" aria-label="Tempo" className="flex h-9 items-stretch overflow-hidden rounded-lg border border-border">
             <button
               type="button"
               onClick={() => bpm && changeBpm(bpm - BPM_STEP)}
               disabled={!bpm || bpm <= BPM_MIN}
               aria-label="Giảm tempo"
-              className="w-9 text-lg leading-none text-soft transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
+              className="w-8 text-lg leading-none text-soft sm:w-9 transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
             >
               −
             </button>
@@ -205,7 +260,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
               onClick={() => startBpm && changeBpm(startBpm)}
               disabled={!bpm}
               title={startBpm ? `Bấm để về tempo mặc định (${startBpm} bpm)` : undefined}
-              className={`min-w-[76px] border-x border-border px-2 font-mono text-xs tabular-nums transition-colors hover:bg-surface-2 ${
+              className={`min-w-[64px] border-x border-border px-1.5 font-mono sm:min-w-[76px] sm:px-2 text-xs tabular-nums transition-colors hover:bg-surface-2 ${
                 bpm && startBpm && bpm !== startBpm ? "text-accent-ink" : "text-soft"
               }`}
             >
@@ -216,11 +271,14 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
               onClick={() => bpm && changeBpm(bpm + BPM_STEP)}
               disabled={!bpm || bpm >= BPM_MAX}
               aria-label="Tăng tempo"
-              className="w-9 text-lg leading-none text-soft transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
+              className="w-8 text-lg leading-none text-soft sm:w-9 transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
             >
               +
             </button>
           </div>
+        </div>
+        {/* Điện thoại: các nút bật/tắt nằm một hàng, kéo ngang được nếu chật */}
+        <div className="flex w-full gap-2 overflow-x-auto sm:w-auto">
           <Toggle on={loop} onClick={() => toggleLoop(!loop)}>
             Lặp lại
           </Toggle>
@@ -229,6 +287,9 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           </Toggle>
           <Toggle on={countIn} onClick={() => toggleCountIn(!countIn)}>
             Đếm vào
+          </Toggle>
+          <Toggle on={horizontal} onClick={() => setLayoutChoice(horizontal ? "page" : "horizontal")}>
+            Cuộn ngang
           </Toggle>
         </div>
       </div>
@@ -242,7 +303,12 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
         </p>
       )}
 
-      <div className="tab-player overflow-hidden rounded-xl border border-line bg-surface p-2 sm:p-4">
+      <div
+        ref={scrollRef}
+        className={`tab-player tab-scroll rounded-xl border border-line bg-surface p-2 sm:p-4 ${
+          horizontal ? "overflow-x-auto overflow-y-hidden overscroll-x-contain" : "overflow-hidden"
+        }`}
+      >
         <div ref={hostRef} />
       </div>
       <p className="text-xs text-muted">Bấm vào một nốt bất kỳ để phát từ chỗ đó.</p>
@@ -256,7 +322,7 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`h-9 rounded-lg border px-2.5 text-xs font-semibold sm:px-3 transition-colors ${
+      className={`h-9 shrink-0 rounded-lg border px-2.5 text-xs font-semibold whitespace-nowrap sm:px-3 transition-colors ${
         on ? "border-accent bg-accent text-accent-fg" : "border-border text-soft hover:border-muted hover:text-text"
       }`}
     >
