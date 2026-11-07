@@ -105,11 +105,6 @@ export function parseSongForm(form: FormData): ParsedSong {
   ];
   if (tags.length > 12) errors.tags = "Tối đa 12 tag";
 
-  // Giữ nguyên khoảng trắng đầu dòng của tab, chỉ bỏ dòng trống thừa ở đầu/cuối
-  const rawTab = form.get("tab");
-  const tab = typeof rawTab === "string" ? rawTab.replace(/\r\n/g, "\n").replace(/^\n+|\s+$/g, "") : "";
-  if (tab.length > 50_000) errors.tab = "Tab quá dài (tối đa 50.000 ký tự)";
-
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -126,7 +121,7 @@ export function parseSongForm(form: FormData): ParsedSong {
       bpm,
       audioUrl: audioUrl || undefined,
       free: form.get("free") === "on",
-      tab: tab || undefined,
+      // Tab chữ không còn nhập trên form (đã thay bằng sheet PDF); tab cũ trong DB giữ nguyên
     },
   };
 }

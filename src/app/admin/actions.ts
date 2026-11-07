@@ -86,7 +86,6 @@ export async function saveSong(
     s.key ?? null,
     s.bpm ?? null,
     s.audioUrl ?? null,
-    s.tab ?? null,
     s.free ?? false,
     s.addedAt,
   ];
@@ -94,15 +93,15 @@ export async function saveSong(
   try {
     if (originalSlug === null) {
       await sql.query(
-        `insert into songs (slug, title, artist, collection, tags, level, key, bpm, audio_url, tab, free, added_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        `insert into songs (slug, title, artist, collection, tags, level, key, bpm, audio_url, free, added_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         params,
       );
     } else {
       const rows = await sql.query(
         `update songs set slug = $1, title = $2, artist = $3, collection = $4, tags = $5, level = $6,
-           key = $7, bpm = $8, audio_url = $9, tab = $10, free = $11, added_at = $12, updated_at = now()
-         where slug = $13
+           key = $7, bpm = $8, audio_url = $9, free = $10, added_at = $11, updated_at = now()
+         where slug = $12
          returning slug`,
         [...params, originalSlug],
       );

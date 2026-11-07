@@ -14,8 +14,6 @@ type Props = {
   action: (prev: SongFormState, form: FormData) => Promise<SongFormState>;
 };
 
-const TAB_TEMPLATE = ["e", "B", "G", "D", "A", "E"].map((s) => `${s}|${"-".repeat(32)}|`).join("\n");
-
 export function SongForm({ song, today, action }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
   const [title, setTitle] = useState(song?.title ?? "");
@@ -167,19 +165,6 @@ export function SongForm({ song, today, action }: Props) {
         </label>
       </fieldset>
 
-      <Field label="Tab dạng chữ (tuỳ chọn)" hint="Nếu bài đã có sheet PDF, site hiển thị sheet PDF; tab chữ hiện bên dưới." name="tab" error={err.tab}>
-        <textarea
-          id="tab"
-          name="tab"
-          rows={16}
-          wrap="off"
-          spellCheck={false}
-          defaultValue={v("tab", song?.tab)}
-          placeholder={TAB_TEMPLATE}
-          className="w-full rounded-xl border border-border bg-surface p-4 font-mono text-sm leading-relaxed outline-none focus:border-accent"
-          {...invalid("tab", err.tab)}
-        />
-      </Field>
 
       <div className="flex flex-wrap gap-2">
         <button type="submit" disabled={pending} className={buttonPrimary}>

@@ -86,9 +86,9 @@ export default async function AdminHome(props: PageProps<"/admin">) {
                           PDF · {s.sheetPageCount} trang
                         </span>
                       )}
-                      {!s.tab && s.sheetPageCount === 0 && (
+                      {s.sheetPageCount === 0 && (
                         <span className="rounded-full border border-dashed border-border px-2 py-0.5 font-semibold text-muted">
-                          Chưa có tab
+                          Chưa có PDF
                         </span>
                       )}
                       {s.audioUrl && (
