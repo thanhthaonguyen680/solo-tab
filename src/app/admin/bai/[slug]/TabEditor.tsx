@@ -55,7 +55,8 @@ export function TabEditor({
     isNew ? "Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “Lưu tab”." : undefined,
   );
   const [error, setError] = useState<string>();
-  const [warnings, setWarnings] = useState<string[]>([]);
+  /** Ô lệch phách: diff > 0 là thừa, < 0 là thiếu (đơn vị tick, 960 = 1 phách đen) */
+  const [warnings, setWarnings] = useState<{ bar: number; diff: number }[]>([]);
   const [info, setInfo] = useState("");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -111,7 +112,11 @@ export function TabEditor({
     const what = note
       ? note.isDead ? "X (đập/chặn dây)" : `phím ${note.fret}${note.slideOutType ? " · luyến" : ""}${note.isLetRing ? " · ngân" : ""}`
       : `${beat.isRest ? "dấu lặng" : "dây trống"} → gõ số để thêm nốt`;
-    setInfo(`Ô ${c.bar + 1} · beat ${c.beat + 1} · dây ${c.string} · ${what} · ${dur}`);
+    const mb = beat.voice.bar.masterBar;
+    const gap = beat.voice.beats.reduce((s, b) => s + b.playbackDuration, 0) - (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator;
+    // trạng thái phách để ngay đầu (dòng này bị cắt bớt khi màn hình hẹp)
+    const barState = gap === 0 ? "" : ` (⚠ ${gap < 0 ? "thiếu" : "thừa"} ${formatBeats(Math.abs(gap))})`;
+    setInfo(`Ô ${c.bar + 1}${barState} · beat ${c.beat + 1} · dây ${c.string} · ${what} · ${dur}`);
   }, []);
 
   const setCursor = useCallback((c: Cursor) => {
@@ -123,15 +128,12 @@ export function TabEditor({
   const checkBars = useCallback(() => {
     const st = staff();
     if (!st) return;
-    const out: string[] = [];
+    const out: { bar: number; diff: number }[] = [];
     st.bars.forEach((bar, i) => {
       const mb = bar.masterBar;
       const want = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator;
       const have = bar.voices[0].beats.reduce((s, b) => s + b.playbackDuration, 0);
-      if (have !== want) {
-        const diff = (have - want) / 240; // đơn vị móc kép
-        out.push(`Ô ${i + 1}: ${diff > 0 ? "thừa" : "thiếu"} ${Math.abs(diff)} móc kép`);
-      }
+      if (have !== want) out.push({ bar: i, diff: have - want });
     });
     setWarnings(out);
   }, []);
@@ -372,6 +374,30 @@ export function TabEditor({
         });
   };
 
+  /**
+   * Ô chưa đủ phách → thêm một dấu lặng vào cuối ô (cùng trường độ với nốt cuối nếu vừa, không thì lấp vừa đủ)
+   * rồi chọn nó để gõ tiếp. Trả về false nếu ô đã đủ phách.
+   */
+  const appendBeat = (barIndex: number) => {
+    const lib = libRef.current, voice = staff()?.bars[barIndex]?.voices[0];
+    if (!lib || !voice) return false;
+    const mb = voice.bar.masterBar;
+    const missing = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator - voice.beats.reduce((s, b) => s + b.playbackDuration, 0);
+    if (missing <= 0) return false;
+    const last = voice.beats[voice.beats.length - 1];
+    const duration = last && 3840 / last.duration <= missing ? last.duration : DURATIONS.find((d) => 3840 / d <= missing);
+    if (!duration) return false;
+    commit(() => {
+      const nb = new lib.model.Beat();
+      nb.duration = duration;
+      nb.isEmpty = false;
+      nb.voice = voice;
+      voice.beats.push(nb);
+    });
+    setCursor({ bar: barIndex, beat: voice.beats.length - 1, string: cursorRef.current.string });
+    return true;
+  };
+
   /** Thêm một ô trống (cùng nhịp, kẻ sẵn dấu lặng móc đơn) ngay sau ô đang chọn */
   const insertBar = () => {
     const x = context(), score = apiRef.current?.score;
@@ -417,6 +443,36 @@ export function TabEditor({
       relinkBars(score);
     });
     setCursor({ bar: Math.min(c.bar, score.masterBars.length - 1), beat: 0, string: c.string });
+  };
+
+  /** Bù phần thiếu của một ô bằng dấu lặng — ở đầu ô (nốt dồn về cuối, nối liền ô sau) hoặc ở cuối ô */
+  const fillBar = (barIndex: number, atStart: boolean) => {
+    const lib = libRef.current, st = staff();
+    const voice = st?.bars[barIndex]?.voices[0];
+    if (!lib || !st || !voice) return;
+    const mb = st.bars[barIndex].masterBar;
+    let missing = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator - voice.beats.reduce((s, b) => s + b.playbackDuration, 0);
+    if (missing <= 0) return;
+    const rests: model.Beat[] = [];
+    for (const d of DURATIONS) {
+      const ticks = 3840 / d;
+      while (missing >= ticks) {
+        const r = new lib.model.Beat();
+        r.duration = d;
+        r.isEmpty = false;
+        r.voice = voice;
+        rests.push(r);
+        missing -= ticks;
+      }
+    }
+    if (!rests.length) return;
+    commit(() => {
+      if (atStart) voice.beats.splice(0, 0, ...rests);
+      else voice.beats.push(...rests);
+    });
+    const c = cursorRef.current;
+    if (atStart && c.bar === barIndex) setCursor({ ...c, beat: c.beat + rests.length });
+    setMessage(`Đã bù ô ${barIndex + 1} bằng ${rests.length} dấu lặng ở ${atStart ? "đầu" : "cuối"} ô.`);
   };
 
   /** Bật/tắt tiếng đập “xx”: X trên 2 dây bass còn trống */
@@ -476,7 +532,13 @@ export function TabEditor({
       let { bar, beat: bi } = c;
       bi += d;
       if (bi < 0) { bar -= 1; if (bar < 0) return; bi = st.bars[bar].voices[0].beats.length - 1; }
-      else if (bi >= st.bars[bar].voices[0].beats.length) { bar += 1; if (bar >= st.bars.length) return; bi = 0; }
+      else if (bi >= st.bars[bar].voices[0].beats.length) {
+        // Như Guitar Pro: ô chưa đủ phách → thêm chỗ trống mới trong cùng ô; ô cuối đã đủ → thêm ô mới
+        if (appendBeat(bar)) return;
+        if (bar === st.bars.length - 1) { insertBar(); return; }
+        bar += 1;
+        bi = 0;
+      }
       setCursor({ bar, beat: bi, string: c.string });
       return;
     }
@@ -668,9 +730,37 @@ export function TabEditor({
       {error && <p role="alert" className="rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-300">{error}</p>}
       {message && !error && <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-2 text-sm text-accent-ink">{message}</p>}
       {warnings.length > 0 && (
-        <p className="rounded-xl border border-dashed border-border px-4 py-2 text-xs text-muted">
-          ⚠ Ô chưa đủ / thừa phách (đổi trường độ để cân lại): {warnings.join(" · ")}
-        </p>
+        <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
+          <p>
+            <b>⚠ Có ô chưa đúng số phách.</b> Khi phát, mỗi ô luôn chiếm đủ số phách của nhịp: ô <b>thiếu</b> sẽ có khoảng lặng ở cuối ô,
+            ô <b>thừa</b> làm nốt bị dồn. Đổi trường độ cho khớp, hoặc bù bằng dấu lặng:
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {warnings.map((w) => (
+              <li key={w.bar} className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCursor({ bar: w.bar, beat: 0, string: cursorRef.current.string })}
+                  className="font-semibold underline-offset-4 hover:underline"
+                >
+                  Ô {w.bar + 1}
+                </button>
+                <span>{w.diff < 0 ? "thiếu" : "thừa"} {formatBeats(Math.abs(w.diff))}</span>
+                {w.diff < 0 && (
+                  <>
+                    <Chip onClick={() => run(() => fillBar(w.bar, true))} title="Thêm dấu lặng ở đầu ô — các nốt dồn về cuối và nối liền sang ô sau (hợp với ô mở đầu / lấy đà)">
+                      Bù lặng đầu ô
+                    </Chip>
+                    <Chip onClick={() => run(() => fillBar(w.bar, false))} title="Thêm dấu lặng ở cuối ô">
+                      Bù lặng cuối ô
+                    </Chip>
+                  </>
+                )}
+                {w.diff > 0 && <span className="text-amber-200/70">→ rút ngắn một nốt hoặc xoá bớt beat</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <details className="rounded-xl border border-line px-4 py-2 text-sm text-muted" open>
@@ -681,7 +771,7 @@ export function TabEditor({
         </p>
         <ul className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
           <li><b className="text-soft">Bấm vào nốt</b>: chọn nốt · <b className="text-soft">bấm vào dây trống</b>: chọn dây đó</li>
-          <li><b className="text-soft">← →</b>: beat trước / sau · <b className="text-soft">↑ ↓</b>: đổi dây đang chọn</li>
+          <li><b className="text-soft">← →</b>: beat trước / sau (ô chưa đủ phách thì → tạo thêm chỗ trống trong ô, như Guitar Pro) · <b className="text-soft">↑ ↓</b>: đổi dây</li>
           <li><b className="text-soft">0–9</b>: đặt phím (gõ liền 2 số cho 10–24); dây trống thì thêm nốt → nốt đôi / hợp âm</li>
           <li><b className="text-soft">D</b>: chia đôi nốt để chèn thêm nốt mà ô không thừa phách</li>
           <li><b className="text-soft">I</b> / <b className="text-soft">Shift + I</b>: chèn beat trống sau / trước</li>
@@ -733,4 +823,11 @@ function Chip({ on = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
       className={`inline-flex h-8 items-center justify-center rounded-md border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${look}`}
     />
   );
+}
+
+/** 960 tick = 1 phách (nốt đen) → "1¼ phách"; lẻ hơn móc kép thì đếm móc ba */
+function formatBeats(ticks: number) {
+  if (ticks % 240 !== 0) return `${ticks / 120} móc ba`;
+  const whole = Math.floor(ticks / 960), frac = ["", "¼", "½", "¾"][(ticks % 960) / 240];
+  return `${whole || !frac ? whole : ""}${frac} phách`;
 }
