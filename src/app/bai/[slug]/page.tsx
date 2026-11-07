@@ -49,6 +49,14 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
         </div>
         <h1 className="text-4xl sm:text-5xl">{song.title}</h1>
         {song.artist && <p className="text-lg text-muted">{song.artist}</p>}
+        {song.authorId && song.authorName && (
+          <p className="text-sm text-muted">
+            Soạn tab bởi{" "}
+            <Link href={`/tac-gia/${song.authorId}`} className="font-semibold text-accent-ink underline-offset-4 hover:underline">
+              {song.authorName}
+            </Link>
+          </p>
+        )}
         <div className="flex flex-wrap gap-1">
           {song.tags.map((t) => (
             <Tag key={t}>{t}</Tag>

@@ -6,8 +6,8 @@ import type { TabReport } from "@/lib/pdf-tab/alphatex";
 import type { PdfOps } from "@/lib/pdf-tab/geometry";
 import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS, SCORE_FILE_MAX_BYTES } from "@/lib/notation-format";
 import { SHEET_LIMITS, type Sheet } from "@/lib/song-model";
-import { commitSheet, removeScore, removeSheet, saveScore } from "../../actions";
-import { buttonPrimary, buttonSecondary } from "../../ui";
+import { commitSheet, removeScore, removeSheet, saveScore } from "@/lib/song-content-actions";
+import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
 
 /** Chiều rộng ảnh mỗi trang — đủ nét khi phóng to trên màn hình lớn */
 const TARGET_WIDTH = 1600;
@@ -94,7 +94,7 @@ export function SheetUploader({ slug, sheet, notationSource }: { slug: string; s
         body.set("width", String(pages[i].width));
         body.set("height", String(pages[i].height));
         body.set("file", pages[i].blob, `trang-${i + 1}`);
-        const res = await fetch(`/api/admin/sheet/${encodeURIComponent(slug)}`, { method: "POST", body });
+        const res = await fetch(`/api/sheet-upload/${encodeURIComponent(slug)}`, { method: "POST", body });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? `Tải trang ${i + 1} thất bại (${res.status})`);

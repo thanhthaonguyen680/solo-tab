@@ -18,6 +18,12 @@ export function SiteHeader() {
               {c.title}
             </Link>
           ))}
+          <Link
+            href="/dong-gop"
+            className="rounded-lg border border-accent/40 px-3 py-2 font-semibold text-accent-ink transition-colors hover:bg-fresh"
+          >
+            Đóng góp
+          </Link>
           {site.membership && (
             <Link href="/goi" className={`ml-1 ${buttonPrimary()}`}>
               Đăng ký

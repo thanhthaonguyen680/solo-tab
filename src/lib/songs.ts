@@ -7,7 +7,7 @@ import type { Song } from "./song-model";
 /** Tag cache của mọi dữ liệu bài hát — trang admin gọi updateTag(SONGS_TAG) sau khi sửa. */
 export const SONGS_TAG = "songs";
 
-export type SongSummary = Omit<Song, "tab" | "audioUrl" | "sheet" | "notation"> & {
+export type SongSummary = Omit<Song, "tab" | "audioUrl" | "sheet" | "notation" | "reviewNote"> & {
   hasAudio: boolean;
   isNew: boolean;
 };
@@ -22,7 +22,7 @@ async function loadAll(): Promise<{ songs: Song[]; newest: string[] }> {
   cacheLife("hours");
 
   const rows = (await sql.query(
-    `select ${SONG_COLUMNS} from songs order by added_at desc, created_at desc`,
+    `select ${SONG_COLUMNS} from songs where status = 'published' order by added_at desc, created_at desc`,
   )) as SongRow[];
   const songs = rows.map((r) => rowToSong(r));
   return { songs, newest: songs.slice(0, NEW_COUNT).map((s) => s.slug) };
@@ -30,10 +30,11 @@ async function loadAll(): Promise<{ songs: Song[]; newest: string[] }> {
 
 /** Bản tóm tắt gửi xuống client — không kèm tab / audio để không lộ nội dung trả phí. */
 function summarize(song: Song, newest: string[]): SongSummary {
-  const { tab, audioUrl, sheet, notation, ...rest } = song;
+  const { tab, audioUrl, sheet, notation, reviewNote, ...rest } = song;
   void tab;
   void sheet;
   void notation;
+  void reviewNote;
   return { ...rest, hasAudio: Boolean(audioUrl), isNew: newest.includes(rest.slug) };
 }
 
@@ -55,8 +56,9 @@ async function loadOne(slug: string): Promise<(Song & { isNew: boolean }) | unde
   const rows = (await sql.query(
     `select ${SONG_COLUMNS},
        (select count(*) from songs newer
-         where (newer.added_at, newer.created_at) > (s.added_at, s.created_at)) < ${NEW_COUNT} as "isNew"
-     from songs s where slug = $1`,
+         where newer.status = 'published'
+           and (newer.added_at, newer.created_at) > (s.added_at, s.created_at)) < ${NEW_COUNT} as "isNew"
+     from songs s where slug = $1 and status = 'published'`,
     [slug],
   )) as (SongRow & { isNew: boolean })[];
   const row = rows[0];

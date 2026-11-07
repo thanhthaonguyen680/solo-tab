@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:setup": "node --env-file=.env.local --experimental-strip-types --no-warnings=ExperimentalWarning scripts/db-setup.ts",
+    "db:migrate": "node --env-file=.env.local --experimental-strip-types --no-warnings=ExperimentalWarning scripts/db-migrate.ts",
     "admin:password": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/admin-password.ts",
     "audio:render": "f() { node scripts/tab-audio/render.mjs \"scripts/tab-audio/scores/$1.mjs\" \"/tmp/solo-tab-$1.wav\" && ffmpeg -v error -y -i \"/tmp/solo-tab-$1.wav\" -codec:a libmp3lame -b:a 160k \"public/audio/$1.mp3\" && rm \"/tmp/solo-tab-$1.wav\" && echo \"→ public/audio/$1.mp3\"; }; f",
     "postinstall": "node scripts/copy-alphatab-assets.mjs",

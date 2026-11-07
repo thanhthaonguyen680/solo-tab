@@ -15,6 +15,13 @@ export async function listSongsForAdmin(): Promise<(Song & { sheetPageCount: num
   return rows.map((r) => ({ ...rowToSong(r), sheetPageCount: r.sheetPageCount }));
 }
 
+/** Thông tin người gửi bài (cho admin duyệt) */
+export async function getAuthorForAdmin(authorId: number) {
+  await requireAdmin();
+  const [row] = await sql`select name, email, created_at::date::text as "since" from users where id = ${authorId}`;
+  return row as { name: string; email: string; since: string } | undefined;
+}
+
 export async function getSongForAdmin(slug: string): Promise<Song | undefined> {
   await requireAdmin();
   const rows = (await sql.query(`select ${SONG_COLUMNS} from songs where slug = $1`, [slug])) as SongRow[];

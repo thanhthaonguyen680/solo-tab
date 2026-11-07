@@ -1,27 +1,27 @@
-import { isAdmin } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
 import { sniffImageType } from "@/lib/sheet-image";
+import { canEditSong } from "@/lib/song-access";
 import { SHEET_LIMITS, SHEET_VERSION_PATTERN } from "@/lib/song-model";
 
 /**
- * Admin tải lên ảnh MỘT trang của sheet (đã được trình duyệt chuyển từ PDF sang ảnh).
+ * Admin / thành viên (bài của mình, chưa đăng) tải lên ảnh MỘT trang của sheet (đã được trình duyệt chuyển từ PDF sang ảnh).
  * Mỗi trang là một request riêng để không vượt giới hạn kích thước request của Vercel.
  * Trang được lưu dưới `version` mới; sheet chỉ đổi sang version này khi admin gọi
  * commitSheet() sau khi tải đủ mọi trang.
  *
  * Body (multipart/form-data): version, page (1..n), width, height, file
  */
-export async function POST(request: Request, ctx: RouteContext<"/api/admin/sheet/[slug]">) {
-  // Chỉ nhận request từ chính site (chống CSRF) và từ admin đã đăng nhập
+export async function POST(request: Request, ctx: RouteContext<"/api/sheet-upload/[slug]">) {
+  // Chỉ nhận request từ chính site (chống CSRF) và từ người có quyền sửa bài
   const origin = request.headers.get("origin");
   if (!origin || new URL(origin).host !== new URL(request.url).host) {
     return Response.json({ error: "Nguồn request không hợp lệ" }, { status: 403 });
   }
-  if (!(await isAdmin())) {
-    return Response.json({ error: "Phiên đăng nhập đã hết — hãy đăng nhập lại" }, { status: 401 });
+  const { slug } = await ctx.params;
+  if (!(await canEditSong(slug))) {
+    return Response.json({ error: "Bạn không có quyền sửa bài này, hoặc phiên đăng nhập đã hết" }, { status: 401 });
   }
 
-  const { slug } = await ctx.params;
   const form = await request.formData().catch(() => null);
   if (!form) return Response.json({ error: "Dữ liệu gửi lên không hợp lệ" }, { status: 400 });
 

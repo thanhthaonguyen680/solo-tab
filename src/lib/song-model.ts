@@ -3,6 +3,16 @@ import { collections, type CollectionSlug } from "@/config/site";
 export const LEVELS = ["Dễ", "Vừa", "Khó"] as const;
 export type Level = (typeof LEVELS)[number];
 
+/** Bài thành viên gửi: nháp → chờ duyệt → đã đăng / bị từ chối. Bài admin tạo luôn "published". */
+export const SONG_STATUSES = ["draft", "pending", "published", "rejected"] as const;
+export type SongStatus = (typeof SONG_STATUSES)[number];
+export const STATUS_LABEL: Record<SongStatus, string> = {
+  draft: "Nháp",
+  pending: "Chờ duyệt",
+  published: "Đã đăng",
+  rejected: "Cần sửa",
+};
+
 export type Song = {
   slug: string;
   title: string;
@@ -24,6 +34,12 @@ export type Song = {
   sheet?: Sheet;
   /** Tab tương tác (alphaTex) — đọc tự động từ sheet PDF Guitar Pro khi admin tải lên */
   notation?: string;
+  status?: SongStatus;
+  /** Thành viên đã gửi bài (không có = admin tự thêm) */
+  authorId?: number;
+  authorName?: string;
+  /** Lời nhắn của admin khi trả bài về cho thành viên sửa */
+  reviewNote?: string;
 };
 
 export type Sheet = {

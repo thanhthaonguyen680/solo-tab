@@ -18,6 +18,11 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 - **Sheet PDF xuất từ Guitar Pro:** hệ thống **tự đọc** số trên tab và ký hiệu trường độ trên khuông nhạc để dựng lại tab tương tác, không cần chép tay. Admin xem trước số ô nhịp, số nốt trước khi lưu.
 - **Sheet PDF vẫn được giữ** làm bản in tham khảo, thu gọn dưới trình phát và có watermark.
 
+### 🤝 Cộng đồng cùng đóng góp
+- **Đăng nhập bằng Google** để gửi tab tự soạn: tải file Guitar Pro / sheet PDF hoặc soạn ngay trên web bằng trình soạn tab.
+- **Kiểm duyệt trước khi đăng:** bài vào hàng chờ, admin nghe thử rồi duyệt hoặc trả về kèm lời nhắn để người gửi sửa.
+- Bài được đăng ghi rõ **“Soạn tab bởi …”**, có trang riêng liệt kê các bài của từng người soạn.
+
 ### 🛠 Trang quản trị gọn nhẹ
 - Thêm, sửa, xoá bài; đặt độ khó, tông, tempo mặc định cho từng bài.
 - **Soạn tab mới từ đầu:** chọn cách lên dây, capo, tempo, nhịp và số ô là có ngay tab trống để điền nốt, không cần Guitar Pro.
@@ -33,7 +38,8 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 ## Tech stack
 
 - **Next.js 16** (App Router) · **TypeScript** · **Tailwind CSS v4**
-- **Neon Postgres**: dữ liệu bài, sheet và tab
+- **Neon Postgres**: dữ liệu bài, sheet, tab và thành viên
+- **Google OAuth** (OpenID Connect + PKCE): đăng nhập thành viên, không cần thư viện ngoài
 - **alphaTab**: vẽ tab, phát nhạc bằng soundfont guitar
 - **pdf.js**: chuyển sheet PDF thành ảnh và đọc tab tự động ngay trong trình duyệt
 - **Vercel**: hosting, tự deploy khi push lên `main`

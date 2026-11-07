@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { encodeScoreFile } from "@/lib/notation-format";
 import { GRIDS, NEW_TAB_LIMITS, TIME_SIGNATURES, TUNINGS, newTabTex } from "@/lib/new-tab";
-import { buttonPrimary, buttonSecondary, inputClass } from "../../ui";
+import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
 
 // Trình sửa nặng (alphaTab) → chỉ tải khi bấm "Sửa tab" / "Tạo tab mới"
 const TabEditor = dynamic(() => import("./TabEditor").then((m) => m.TabEditor), {

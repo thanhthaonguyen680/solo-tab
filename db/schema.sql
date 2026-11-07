@@ -43,3 +43,37 @@ create table if not exists song_sheet_pages (
 
 -- Tab tương tác (alphaTex), đọc tự động từ sheet PDF xuất bởi Guitar Pro
 alter table songs add column if not exists notation text;
+
+-- ---------- Thành viên đóng góp (đăng nhập Google) ----------
+
+create table if not exists users (
+  id             bigint generated always as identity primary key,
+  -- "sub" của Google: mã tài khoản không đổi (email có thể đổi)
+  google_sub     text not null unique,
+  email          text not null,
+  name           text not null,
+  avatar_url     text,
+  is_banned      boolean not null default false,
+  created_at     timestamptz not null default now(),
+  last_login_at  timestamptz not null default now()
+);
+
+-- Phiên đăng nhập: cookie giữ token ngẫu nhiên, DB chỉ lưu SHA-256 của token
+create table if not exists user_sessions (
+  token_hash  text primary key,
+  user_id     bigint not null references users (id) on delete cascade,
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists user_sessions_user_idx on user_sessions (user_id);
+
+-- Bài do thành viên gửi: nháp → chờ duyệt → đã đăng / bị từ chối. Bài admin tạo mặc định "published".
+alter table songs add column if not exists status text not null default 'published';
+do $$ begin
+  alter table songs add constraint songs_status_check check (status in ('draft', 'pending', 'published', 'rejected'));
+exception when duplicate_object then null; end $$;
+alter table songs add column if not exists author_id bigint references users (id) on delete set null;
+alter table songs add column if not exists review_note text;
+alter table songs add column if not exists submitted_at timestamptz;
+create index if not exists songs_author_idx on songs (author_id);
+create index if not exists songs_status_idx on songs (status);

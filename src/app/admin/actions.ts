@@ -1,12 +1,10 @@
 "use server";
 
-import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkAdminPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
-import { isValidFileNotation } from "@/lib/notation-format";
-import { NOTATION_MAX_CHARS, parseSongForm, SHEET_VERSION_PATTERN, type SongFieldErrors } from "@/lib/song-model";
-import { SONGS_TAG } from "@/lib/songs";
+import { refreshPublicPages } from "@/lib/song-access";
+import { parseSongForm, type SongFieldErrors } from "@/lib/song-model";
 
 // ---------- Đăng nhập ----------
 
@@ -32,17 +30,6 @@ export async function logout() {
 }
 
 // ---------- Bài hát ----------
-
-/**
- * Làm mới dữ liệu bài trên site công khai ngay sau khi admin sửa.
- * updateTag làm mới dữ liệu cache; revalidatePath buộc trang của chính bài đó render lại
- * ngay lượt xem tiếp theo (nếu không, lượt xem đầu tiên có thể vẫn thấy bản cũ — ví dụ vẫn
- * thấy tab sau khi đã bỏ "miễn phí").
- */
-function refreshPublicPages(...slugs: (string | null)[]) {
-  updateTag(SONGS_TAG);
-  for (const slug of new Set(slugs)) if (slug) revalidatePath(`/bai/${slug}`);
-}
 
 export type SongFormState = {
   errors?: SongFieldErrors;
@@ -120,82 +107,32 @@ export async function saveSong(
   redirect(`/admin?da-luu=${encodeURIComponent(s.slug)}`);
 }
 
-// ---------- Sheet PDF ----------
+// ---------- Duyệt bài thành viên gửi ----------
 
-export type SheetResult = { ok: true } | { ok: false; error: string };
-
-/**
- * Kích hoạt sheet vừa tải lên: chỉ khi đã có đủ `pageCount` trang liên tục 1..n.
- * Đổi version, lưu tab tương tác đọc được từ PDF (nếu có) và xoá các version cũ trong cùng một transaction.
- */
-export async function commitSheet(
-  slug: string,
-  version: string,
-  pageCount: number,
-  notation: string | null = null,
-): Promise<SheetResult> {
+/** Đăng bài: hiện trên site, ngày thêm = hôm nay (để được gắn nhãn "Mới") */
+export async function approveSong(slug: string) {
   await requireAdmin();
-  if (!SHEET_VERSION_PATTERN.test(version) || !Number.isInteger(pageCount) || pageCount < 1) {
-    return { ok: false, error: "Dữ liệu không hợp lệ" };
-  }
-  if (notation !== null && (typeof notation !== "string" || notation.length > NOTATION_MAX_CHARS)) {
-    return { ok: false, error: "Dữ liệu tab tương tác không hợp lệ" };
-  }
-
-  const [{ n, maxPage }] = await sql.query(
-    `select count(*)::int as n, coalesce(max(page), 0)::int as "maxPage"
-     from song_sheet_pages where song_slug = $1 and version = $2`,
-    [slug, version],
-  );
-  if (n !== pageCount || maxPage !== pageCount) {
-    return { ok: false, error: `Mới tải lên ${n}/${pageCount} trang — hãy thử lại` };
-  }
-
-  const [updated] = await sql.transaction([
-    // Tab lấy từ file Guitar Pro gốc chính xác hơn bản đọc từ PDF → giữ nguyên nếu đã có
-    sql`update songs set sheet_version = ${version},
-          notation = case when notation like '@score:%' then notation else ${notation} end,
-          updated_at = now()
-        where slug = ${slug} returning slug`,
-    sql`delete from song_sheet_pages where song_slug = ${slug} and version <> ${version}`,
-  ]);
-  if (updated.length === 0) return { ok: false, error: "Không tìm thấy bài" };
-
+  await sql`update songs set status = 'published', added_at = current_date, review_note = null, updated_at = now()
+            where slug = ${slug} and status <> 'published'`;
   refreshPublicPages(slug);
-  return { ok: true };
+  redirect(`/admin?da-duyet=${encodeURIComponent(slug)}`);
 }
 
-export async function removeSheet(slug: string): Promise<SheetResult> {
+/** Trả bài về cho thành viên sửa, kèm lời nhắn */
+export async function rejectSong(slug: string, form: FormData) {
   await requireAdmin();
-  await sql.transaction([
-    sql`update songs set sheet_version = null,
-          notation = case when notation like '@score:%' then notation else null end,
-          updated_at = now()
-        where slug = ${slug}`,
-    sql`delete from song_sheet_pages where song_slug = ${slug}`,
-  ]);
+  const note = String(form.get("note") ?? "").trim().slice(0, 1000) || null;
+  await sql`update songs set status = 'rejected', review_note = ${note}, updated_at = now() where slug = ${slug}`;
   refreshPublicPages(slug);
-  return { ok: true };
+  redirect(`/admin/bai/${encodeURIComponent(slug)}?da-tra-ve=1`);
 }
 
-/** Lưu file Guitar Pro / MusicXML gốc làm tab tương tác (không đụng tới sheet PDF) */
-export async function saveScore(slug: string, notation: string): Promise<SheetResult> {
+/** Gỡ bài thành viên đã đăng về trạng thái chờ duyệt (ẩn khỏi site) */
+export async function unpublishSong(slug: string) {
   await requireAdmin();
-  if (typeof notation !== "string" || !isValidFileNotation(notation)) {
-    return { ok: false, error: "File tab không hợp lệ hoặc quá lớn" };
-  }
-  const rows = await sql`update songs set notation = ${notation}, updated_at = now() where slug = ${slug} returning slug`;
-  if (rows.length === 0) return { ok: false, error: "Không tìm thấy bài" };
+  await sql`update songs set status = 'pending', updated_at = now() where slug = ${slug} and author_id is not null`;
   refreshPublicPages(slug);
-  return { ok: true };
-}
-
-/** Bỏ tab tương tác của bài (giữ sheet PDF nếu có) */
-export async function removeScore(slug: string): Promise<SheetResult> {
-  await requireAdmin();
-  await sql`update songs set notation = null, updated_at = now() where slug = ${slug}`;
-  refreshPublicPages(slug);
-  return { ok: true };
+  redirect(`/admin/bai/${encodeURIComponent(slug)}`);
 }
 
 export async function deleteSong(slug: string) {

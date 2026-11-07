@@ -4,8 +4,8 @@ import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { decodeNotation, encodeScoreFile } from "@/lib/notation-format";
-import { saveScore } from "../../actions";
-import { buttonPrimary, buttonSecondary } from "../../ui";
+import { saveScore } from "@/lib/song-content-actions";
+import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
 
 type Beat = model.Beat;
 type Note = model.Note;

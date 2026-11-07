@@ -1,7 +1,7 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
 import type { CollectionSlug } from "@/config/site";
-import type { Level, Sheet, Song } from "./song-model";
+import type { Level, Sheet, Song, SongStatus } from "./song-model";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("Thiếu DATABASE_URL — xem README phần Database");
@@ -11,7 +11,9 @@ export const sql = neon(url);
 /** Cột trả về từ bảng songs, đổi tên sang camelCase */
 export const SONG_COLUMNS = `
   slug, title, artist, collection, tags, level, key, bpm,
-  audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation`;
+  audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation,
+  status, author_id::int as "authorId", review_note as "reviewNote",
+  (select u.name from users u where u.id = author_id) as "authorName"`;
 
 export type SongRow = {
   slug: string;
@@ -28,6 +30,10 @@ export type SongRow = {
   addedAt: string;
   sheetVersion: string | null;
   notation: string | null;
+  status: SongStatus;
+  authorId: number | null;
+  reviewNote: string | null;
+  authorName: string | null;
 };
 
 export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
@@ -46,6 +52,10 @@ export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
     addedAt: r.addedAt,
     sheet: r.sheetVersion && sheetPages.length > 0 ? { version: r.sheetVersion, pages: sheetPages } : undefined,
     notation: r.notation ?? undefined,
+    status: r.status,
+    authorId: r.authorId ?? undefined,
+    authorName: r.authorName ?? undefined,
+    reviewNote: r.reviewNote ?? undefined,
   };
 }
 
