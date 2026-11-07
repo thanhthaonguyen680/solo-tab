@@ -5,9 +5,14 @@ const m6 = [[1, 5, 3], [1, 3, 0], [2, 4, 2], [3, 3, 0], [3.5, 2, 0], [4, 3, 2], 
 const m7 = [[1, 5, 5], [1, 4, 0], [2, 4, 4], [3, 3, 0]]; // D
 
 export default {
+  title: "Bèo dạt mây trôi",
+  artist: "Dân ca Quan họ",
   bpm: 72,
+  dynamic: "mf",
   capo: 1,
   beatsPerMeasure: 4,
+  // Tên hợp âm theo sheet, theo chỉ số ô nhịp (0 = ô 1)
+  chords: { 4: "Em", 5: "C", 6: "D", 7: "G", 8: "D/F#", 9: "Em", 10: "C", 11: "D", 12: "C", 13: "G", 14: "Bm7", 15: "Em", 16: "C", 17: "D", 18: "G" },
   measures: [
     /* 1 */ [[3, 3, 0]],
     /* 2 */ [[1, 6, 3], [1, 3, 0], [2, 4, 0], [3, 2, 3], [4, 2, 0], [4.5, 2, 1, "slide"]],

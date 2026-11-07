@@ -122,3 +122,20 @@ h2 {
 .sheet-staff {
   background-image: repeating-linear-gradient(to bottom, #c9c4bb 0 1px, transparent 1px 14px);
 }
+
+/* alphaTab: con trỏ phát nhạc và nốt đang phát */
+.tab-player .at-cursor-bar {
+  background: color-mix(in oklab, var(--accent) 9%, transparent);
+}
+.tab-player .at-cursor-beat {
+  width: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+.tab-player .at-selection div {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+}
+.tab-player .at-highlight * {
+  fill: var(--accent);
+  stroke: var(--accent);
+}

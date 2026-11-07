@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AudioBadge, FreeBadge, NewBadge, Tag } from "@/components/Badges";
 import { buttonPrimary } from "@/components/buttons";
+import { TabPlayer } from "@/components/TabPlayer";
 import { collections, formatVnd, site } from "@/config/site";
+import { getNotation } from "@/data/notation";
 import { canViewSong } from "@/lib/access";
 import type { Sheet } from "@/lib/song-model";
 import { allSongSlugs, getSong } from "@/lib/songs";
@@ -23,6 +25,8 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
   if (!song) notFound();
 
   const unlocked = canViewSong(song);
+  // Chỉ gửi dữ liệu nốt xuống trình duyệt khi người xem có quyền
+  const notation = unlocked ? await getNotation(song.slug) : null;
   const collection = collections[song.collection];
 
   const meta = [
@@ -32,7 +36,7 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
   ].filter((m): m is [string, string] => Boolean(m[1]));
 
   return (
-    <article className={`mx-auto flex flex-col gap-6 px-4 py-10 ${song.sheet ? "max-w-4xl" : "max-w-3xl"}`}>
+    <article className={`mx-auto flex flex-col gap-6 px-4 py-10 ${song.sheet || notation ? "max-w-4xl" : "max-w-3xl"}`}>
       <Link href={`/${collection.slug}`} className="w-fit text-sm text-muted hover:text-text">
         ← {site.name} {collection.title}
       </Link>
@@ -65,15 +69,25 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
 
       {unlocked ? (
         <section className="flex flex-col gap-4">
-          {song.audioUrl && (
-            <div className="rounded-xl border border-accent/40 bg-fresh p-4">
-              <p className="eyebrow mb-2">Audio mẫu</p>
-              <audio controls preload="none" src={song.audioUrl} className="w-full" />
-            </div>
+          {/* Có dữ liệu nốt → tab tương tác tự phát nhạc, thay cho file audio */}
+          {notation ? (
+            <TabPlayer notation={notation} />
+          ) : (
+            song.audioUrl && (
+              <div className="rounded-xl border border-accent/40 bg-fresh p-4">
+                <p className="eyebrow mb-2">Audio mẫu</p>
+                <audio controls preload="none" src={song.audioUrl} className="w-full" />
+              </div>
+            )
           )}
-          {song.sheet && <SheetPages slug={song.slug} title={song.title} sheet={song.sheet} />}
-          {/* Tab chữ: hiện thêm nếu có; nếu không có cả sheet lẫn tab thì báo đang cập nhật */}
-          {(song.tab || !song.sheet) && <TabBlock tab={song.tab} />}
+          {song.sheet && (
+            <>
+              {notation && <h2 className="mt-8 text-2xl">Sheet PDF</h2>}
+              <SheetPages slug={song.slug} title={song.title} sheet={song.sheet} />
+            </>
+          )}
+          {/* Tab chữ: hiện thêm nếu có; nếu không có sheet / tab tương tác thì báo đang cập nhật */}
+          {!notation && (song.tab || !song.sheet) && <TabBlock tab={song.tab} />}
         </section>
       ) : (
         <section className="relative overflow-hidden rounded-xl border border-border">
