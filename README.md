@@ -22,7 +22,7 @@ Database `solo-tab` (Neon, region Singapore, gói Free) được tạo qua Verce
 npm run db:setup   # tạo bảng theo db/schema.sql + nạp bài mẫu (bài trùng slug được giữ nguyên)
 ```
 
-App đọc bài từ database (`src/lib/songs.ts`, cache bằng `use cache` + tag `songs`). `src/data/songs.ts` chỉ còn là dữ liệu mẫu để nạp lần đầu.
+App đọc bài từ database (`src/lib/songs.ts`, cache bằng `use cache` + tag `songs`). `src/data/songs.ts` chỉ còn là dữ liệu khởi tạo để nạp lần đầu.
 
 ## Trang admin (`/admin`)
 
@@ -49,7 +49,7 @@ Lệnh trên ghi 2 biến vào `.env.local`: `ADMIN_PASSWORD_HASH` (hash scrypt,
 | `src/app/goi/page.tsx` | Trang gói thành viên |
 | `src/config/site.ts` | Tên site, giá gói, kênh liên hệ, danh sách bộ sưu tập |
 | `src/app/admin/` | Trang admin: đăng nhập, danh sách bài, form thêm/sửa, server actions |
-| `src/data/songs.ts` | Dữ liệu mẫu để nạp vào database lần đầu |
+| `src/data/songs.ts` | Dữ liệu khởi tạo để nạp vào database lần đầu |
 | `src/lib/songs.ts` | Truy vấn bài cho site công khai (có cache); `SongSummary` gửi xuống client không kèm tab/audio |
 | `src/lib/song-model.ts` | Kiểu `Song`, tạo slug tiếng Việt, kiểm tra dữ liệu form admin |
 | `src/lib/db.ts` | Kết nối Neon Postgres |
@@ -63,9 +63,9 @@ Lệnh trên ghi 2 biến vào `.env.local`: `ADMIN_PASSWORD_HASH` (hash scrypt,
 
 Vào `/admin` → **Thêm bài**. Nhãn **Mới** tự gắn cho 4 bài có ngày thêm gần nhất; tick **Mở miễn phí** để ai cũng xem được tab.
 
-## Dữ liệu mẫu
+## Dữ liệu khởi tạo
 
-Các bài hiện có là dân ca / nhạc cổ điển phổ biến, dùng để dựng giao diện. Tab là bài tập minh hoạ (không phải bản chuyển soạn), `public/audio/demo.wav` là âm thanh tổng hợp bằng thuật toán Karplus–Strong.
+`src/data/songs.ts` chỉ còn bài Bèo dạt mây trôi. Audio `public/audio/beo-dat-may-troi.mp3` được tổng hợp bằng `npm run audio:render -- beo-dat-may-troi` (Karplus–Strong); tab tương tác lấy từ `src/data/notation/`.
 
 ## Việc tiếp theo
 

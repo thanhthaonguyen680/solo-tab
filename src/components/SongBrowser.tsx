@@ -79,7 +79,11 @@ export function SongBrowser({ songs }: { songs: SongSummary[] }) {
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted">
-          Không tìm thấy bài nào khớp “{query}”.
+          {songs.length === 0
+            ? "Kho này chưa có bài — sắp cập nhật."
+            : query
+              ? `Không tìm thấy bài nào khớp “${query}”.`
+              : "Không có bài nào có audio."}
         </div>
       )}
     </div>
