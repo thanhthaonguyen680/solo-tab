@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { TabReport } from "@/lib/pdf-tab/alphatex";
 import type { PdfOps } from "@/lib/pdf-tab/geometry";
+import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS, SCORE_FILE_MAX_BYTES } from "@/lib/notation-format";
 import { SHEET_LIMITS, type Sheet } from "@/lib/song-model";
-import { commitSheet, removeSheet } from "../../actions";
+import { commitSheet, removeScore, removeSheet, saveScore } from "../../actions";
 import { buttonPrimary, buttonSecondary } from "../../ui";
 
 /** Chiều rộng ảnh mỗi trang — đủ nét khi phóng to trên màn hình lớn */
@@ -17,13 +18,27 @@ type RenderedPage = { blob: Blob; url: string; width: number; height: number };
 type TabResult = { notation: string; report: TabReport } | { notation: null; reason: string };
 type Rendered = { pages: RenderedPage[]; tab: TabResult };
 
+/** File Guitar Pro / MusicXML đã đọc thử bằng alphaTab */
+type ScoreFile = {
+  fileName: string;
+  bytes: Uint8Array;
+  title: string;
+  tempo: number;
+  bars: number;
+  tracks: { index: number; name: string; notes: number }[];
+};
+
+/** Tab tương tác hiện có của bài: từ file Guitar Pro gốc, đọc từ PDF, hoặc chưa có */
+export type NotationSource = "file" | "pdf" | null;
+
 type State =
   | { step: "idle" }
+  | { step: "score"; file: ScoreFile; track: number; saving: boolean }
   | { step: "rendering"; label: string; done: number; total: number }
   | ({ step: "ready"; fileName: string } & Rendered)
   | ({ step: "uploading"; done: number; total: number } & Rendered);
 
-export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; sheet?: Sheet; hasNotation: boolean }) {
+export function SheetUploader({ slug, sheet, notationSource }: { slug: string; sheet?: Sheet; notationSource: NotationSource }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ step: "idle" });
@@ -38,8 +53,21 @@ export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; shee
     setError(undefined);
     setNotice(undefined);
     if (!file) return;
+    if (isScoreFile(file.name)) {
+      try {
+        const score = await readScoreFile(file);
+        const guitar = score.tracks.find((t) => t.notes > 0) ?? score.tracks[0];
+        setState({ step: "score", file: score, track: guitar?.index ?? 0, saving: false });
+      } catch (e) {
+        setState({ step: "idle" });
+        setError(e instanceof Error ? e.message : "Không đọc được file tab.");
+      } finally {
+        if (inputRef.current) inputRef.current.value = "";
+      }
+      return;
+    }
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      return setError("Hãy chọn file PDF.");
+      return setError(`Hãy chọn file PDF hoặc file tab (${SCORE_FILE_EXTENSIONS.join(", ")}).`);
     }
     if (file.size > MAX_PDF_BYTES) return setError("File PDF quá lớn (tối đa 40 MB).");
 
@@ -87,6 +115,28 @@ export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; shee
     }
   }
 
+  async function onSaveScore(file: ScoreFile, track: number) {
+    setError(undefined);
+    setState({ step: "score", file, track, saving: true });
+    const result = await saveScore(slug, encodeScoreFile(file.bytes, track));
+    if (!result.ok) {
+      setState({ step: "score", file, track, saving: false });
+      return setError(result.error);
+    }
+    setState({ step: "idle" });
+    setNotice(`✓ Đã lưu tab tương tác từ “${file.fileName}” (${file.bars} ô nhịp).`);
+    router.refresh();
+  }
+
+  async function onRemoveScore() {
+    if (!confirm("Bỏ tab tương tác của bài này? (Sheet PDF vẫn giữ nguyên)")) return;
+    const result = await removeScore(slug);
+    if (result.ok) {
+      setNotice("✓ Đã bỏ tab tương tác.");
+      router.refresh();
+    } else setError(result.error);
+  }
+
   async function onRemove() {
     if (!confirm("Xoá sheet PDF của bài này?")) return;
     const result = await removeSheet(slug);
@@ -96,41 +146,55 @@ export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; shee
     } else setError(result.error);
   }
 
-  const busy = state.step === "rendering" || state.step === "uploading";
+  const busy = state.step === "rendering" || state.step === "uploading" || (state.step === "score" && state.saving);
 
   return (
     <section id="sheet" className="flex scroll-mt-24 flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
-            Sheet PDF
-            {sheet && state.step === "idle" && (
+            Sheet &amp; tab tương tác
+            {state.step === "idle" && (
               <span
                 className={`rounded-full border px-2 py-0.5 font-sans text-xs font-semibold ${
-                  hasNotation ? "border-accent/40 bg-fresh text-accent-ink" : "border-dashed border-border text-muted"
+                  notationSource ? "border-accent/40 bg-fresh text-accent-ink" : "border-dashed border-border text-muted"
                 }`}
               >
-                {hasNotation ? "Có tab tương tác" : "Chưa có tab tương tác"}
+                {notationSource === "file"
+                  ? "Có tab tương tác (file Guitar Pro)"
+                  : notationSource === "pdf"
+                    ? "Có tab tương tác (đọc từ PDF)"
+                    : "Chưa có tab tương tác"}
               </span>
             )}
           </h2>
           <p className="text-sm text-muted">
-            Mỗi trang PDF được chuyển thành ảnh ngay trên máy bạn rồi mới tải lên. Tối đa {SHEET_LIMITS.maxPages} trang.
-            PDF xuất từ Guitar Pro sẽ được đọc tự động thành tab tương tác (có tiếng, con trỏ chạy theo nốt).
+            <b className="text-soft">Sheet PDF</b>: mỗi trang được chuyển thành ảnh ngay trên máy bạn rồi mới tải lên (tối đa{" "}
+            {SHEET_LIMITS.maxPages} trang); PDF xuất từ Guitar Pro còn được đọc tự động thành tab tương tác.{" "}
+            <b className="text-soft">File Guitar Pro</b> (.gp5, .gp, .gpx…) hoặc MusicXML: cho tab tương tác chính xác nhất.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className={`${buttonPrimary} cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
-            {sheet ? "Thay sheet PDF" : "Chọn file PDF"}
+            Chọn file PDF / Guitar Pro
             <input
               ref={inputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={["application/pdf", ".pdf", ...SCORE_FILE_EXTENSIONS].join(",")}
               className="sr-only"
               disabled={busy}
               onChange={(e) => onPick(e.target.files?.[0])}
             />
           </label>
+          {notationSource === "file" && state.step === "idle" && (
+            <button
+              type="button"
+              onClick={onRemoveScore}
+              className="rounded-lg border border-red-500/40 bg-bg px-4 py-2.5 text-sm font-semibold text-red-400 transition-colors hover:border-red-500"
+            >
+              Bỏ tab tương tác
+            </button>
+          )}
           {sheet && state.step === "idle" && (
             <button type="button" onClick={onRemove} className="rounded-lg border border-red-500/40 bg-bg px-4 py-2.5 text-sm font-semibold text-red-400 transition-colors hover:border-red-500">
               Xoá sheet
@@ -167,6 +231,48 @@ export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; shee
         </div>
       )}
 
+      {state.step === "score" && (
+        <div className="flex flex-col gap-3 rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm text-accent-ink">
+          <p>
+            <span className="font-semibold">🎸 File tab “{state.file.fileName}”:</span> {state.file.title} ·{" "}
+            {state.file.bars} ô nhịp · tempo {state.file.tempo}
+            {state.file.tracks.length === 1 && ` · ${state.file.tracks[0].notes} nốt`}
+          </p>
+          {state.file.tracks.length > 1 && (
+            <label className="flex flex-wrap items-center gap-2 text-soft">
+              Track hiển thị:
+              <select
+                value={state.track}
+                onChange={(e) => setState({ ...state, track: Number(e.target.value) })}
+                className="h-9 rounded-lg border border-border bg-bg px-2 text-sm text-soft outline-none focus:border-accent"
+              >
+                {state.file.tracks.map((t) => (
+                  <option key={t.index} value={t.index}>
+                    {t.name} ({t.notes} nốt)
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={state.saving}
+              onClick={() => onSaveScore(state.file, state.track)}
+              className={buttonPrimary}
+            >
+              {state.saving ? "Đang lưu…" : "Lưu tab tương tác"}
+            </button>
+            <button type="button" disabled={state.saving} onClick={() => setState({ step: "idle" })} className={buttonSecondary}>
+              Huỷ
+            </button>
+          </div>
+          {notationSource && (
+            <p className="text-xs text-muted">Tab tương tác hiện có của bài sẽ được thay bằng file này. Sheet PDF vẫn giữ nguyên.</p>
+          )}
+        </div>
+      )}
+
       {(state.step === "ready" || state.step === "uploading") && <TabSummary tab={state.tab} />}
 
       {previews ? (
@@ -182,6 +288,29 @@ export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; shee
       )}
     </section>
   );
+}
+
+/** Đọc thử file Guitar Pro / MusicXML bằng alphaTab để báo thông tin trước khi lưu */
+async function readScoreFile(file: File): Promise<ScoreFile> {
+  if (file.size > SCORE_FILE_MAX_BYTES) throw new Error(`File quá lớn (tối đa ${SCORE_FILE_MAX_BYTES / 1024} KB).`);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const alphaTab = await import("@coderline/alphatab");
+  let score;
+  try {
+    score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes);
+  } catch (e) {
+    console.error("alphaTab:", e);
+    throw new Error("Không đọc được file tab (file hỏng hoặc định dạng chưa hỗ trợ).");
+  }
+  const tracks = score.tracks
+    .filter((t) => !t.isPercussion)
+    .map((t) => ({
+      index: t.index,
+      name: t.name || `Track ${t.index + 1}`,
+      notes: t.staves.reduce((n, st) => n + st.bars.reduce((m, b) => m + b.voices.reduce((k, v) => k + v.beats.reduce((j, beat) => j + beat.notes.length, 0), 0), 0), 0),
+    }));
+  if (!tracks.length) throw new Error("File không có track nhạc cụ nào để hiển thị.");
+  return { fileName: file.name, bytes, title: score.title || file.name, tempo: score.tempo, bars: score.masterBars.length, tracks };
 }
 
 function TabSummary({ tab }: { tab: TabResult }) {

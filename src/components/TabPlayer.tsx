@@ -2,6 +2,7 @@
 
 import type { AlphaTabApi } from "@coderline/alphatab";
 import { useEffect, useRef, useState } from "react";
+import { decodeNotation } from "@/lib/notation-format";
 
 const BPM_STEP = 4;
 const BPM_MIN = 30;
@@ -13,18 +14,20 @@ type Status =
   | { kind: "error"; message: string };
 
 /**
- * Tab tương tác: alphaTab vẽ khuông nhạc + tab từ alphaTex và tự phát bằng soundfont.
- * Con trỏ chạy theo từng nốt, trang tự cuộn theo, chỉnh được tốc độ / lặp / máy đếm nhịp.
+ * Tab tương tác: alphaTab vẽ khuông nhạc + tab (từ alphaTex hoặc file Guitar Pro / MusicXML gốc)
+ * và tự phát bằng soundfont. Con trỏ chạy theo từng nốt, trang tự cuộn theo,
+ * chỉnh được tempo / lặp / máy đếm nhịp. `defaultBpm`: ô Tempo trong admin — tempo khi mở bài.
  */
-export function TabPlayer({ notation }: { notation: string }) {
+export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultBpm?: number }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<AlphaTabApi | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "loading", label: "Đang vẽ tab…" });
   const [playerReady, setPlayerReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState({ current: 0, end: 0 });
-  /** Tempo gốc của bài (ghi trong dữ liệu nốt) và tempo người xem đang chọn */
+  /** Tempo ghi trong dữ liệu nốt, tempo mặc định khi mở bài, và tempo người xem đang chọn */
   const [baseBpm, setBaseBpm] = useState<number | null>(null);
+  const [startBpm, setStartBpm] = useState<number | null>(null);
   const [bpm, setBpm] = useState<number | null>(null);
   const [loop, setLoop] = useState(false);
   const [metronome, setMetronome] = useState(false);
@@ -73,8 +76,11 @@ export function TabPlayer({ notation }: { notation: string }) {
       apiRef.current = api;
 
       api.scoreLoaded.on((score) => {
+        const start = defaultBpm ?? score.tempo;
         setBaseBpm(score.tempo);
-        setBpm(score.tempo);
+        setStartBpm(start);
+        setBpm(start);
+        if (api) api.playbackSpeed = start / score.tempo;
       });
       api.renderFinished.on(() => setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: "Đang tải tiếng đàn…" } : s)));
       api.soundFontLoad.on((e) => {
@@ -96,7 +102,9 @@ export function TabPlayer({ notation }: { notation: string }) {
         setStatus({ kind: "error", message: "Không tải được tab tương tác." });
       });
 
-      api.tex(notation);
+      const data = decodeNotation(notation);
+      if (data.kind === "file") api.load(data.bytes, [data.track]);
+      else api.tex(data.tex);
     })().catch((e) => {
       console.error("alphaTab:", e);
       setStatus({ kind: "error", message: "Không tải được tab tương tác." });
@@ -113,7 +121,7 @@ export function TabPlayer({ notation }: { notation: string }) {
         silentAudioRef.current = null;
       }
     };
-  }, [notation]);
+  }, [notation, defaultBpm]);
 
   function togglePlay() {
     const api = apiRef.current;
@@ -194,11 +202,11 @@ export function TabPlayer({ notation }: { notation: string }) {
             </button>
             <button
               type="button"
-              onClick={() => baseBpm && changeBpm(baseBpm)}
+              onClick={() => startBpm && changeBpm(startBpm)}
               disabled={!bpm}
-              title={baseBpm ? `Bấm để về tempo gốc (${baseBpm} bpm)` : undefined}
+              title={startBpm ? `Bấm để về tempo mặc định (${startBpm} bpm)` : undefined}
               className={`min-w-[76px] border-x border-border px-2 font-mono text-xs tabular-nums transition-colors hover:bg-surface-2 ${
-                bpm && baseBpm && bpm !== baseBpm ? "text-accent-ink" : "text-soft"
+                bpm && startBpm && bpm !== startBpm ? "text-accent-ink" : "text-soft"
               }`}
             >
               {bpm ?? "—"} bpm

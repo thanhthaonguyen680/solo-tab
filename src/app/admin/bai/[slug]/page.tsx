@@ -5,6 +5,7 @@ import { getSongForAdmin } from "@/lib/admin-songs";
 import { deleteSong, saveSong } from "../../actions";
 import { SongForm } from "../../SongForm";
 import { DeleteSongButton } from "./DeleteSongButton";
+import { isFileNotation } from "@/lib/notation-format";
 import { SheetUploader } from "./SheetUploader";
 
 export const metadata: Metadata = { title: "Sửa bài" };
@@ -31,10 +32,14 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
       </div>
       {isNew && (
         <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
-          ✓ Đã tạo bài. Giờ tải sheet PDF lên ở khung bên dưới (hoặc dán tab dạng chữ trong form).
+          ✓ Đã tạo bài. Giờ tải sheet PDF hoặc file Guitar Pro (.gp5…) lên ở khung bên dưới.
         </p>
       )}
-      <SheetUploader slug={song.slug} sheet={song.sheet} hasNotation={Boolean(song.notation)} />
+      <SheetUploader
+        slug={song.slug}
+        sheet={song.sheet}
+        notationSource={song.notation ? (isFileNotation(song.notation) ? "file" : "pdf") : null}
+      />
       <SongForm song={song} today={song.addedAt} action={saveSong.bind(null, song.slug)} />
     </div>
   );

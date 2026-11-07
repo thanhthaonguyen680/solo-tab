@@ -71,7 +71,7 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
         <section className="flex flex-col gap-4">
           {/* Có dữ liệu nốt → tab tương tác tự phát nhạc, thay cho file audio */}
           {notation ? (
-            <TabPlayer notation={notation} />
+            <TabPlayer notation={notation} defaultBpm={song.bpm} />
           ) : (
             song.audioUrl && (
               <div className="rounded-xl border border-accent/40 bg-fresh p-4">
@@ -80,12 +80,30 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
               </div>
             )
           )}
-          {song.sheet && (
-            <>
-              {notation && <h2 className="mt-8 text-2xl">Sheet PDF</h2>}
+          {song.sheet &&
+            (notation ? (
+              // Đã có tab tương tác → sheet PDF chỉ là bản in tham khảo, thu gọn mặc định
+              <details className="group mt-6 rounded-xl border border-line bg-surface">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-5 py-4 transition-colors hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-baseline gap-2">
+                    <span className="font-display text-xl font-semibold">Sheet PDF</span>
+                    <span className="text-sm text-muted">· {song.sheet.pages.length} trang</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-accent-ink">
+                    <span className="group-open:hidden">Xem sheet</span>
+                    <span className="hidden group-open:inline">Thu gọn</span>
+                    <svg viewBox="0 0 16 16" className="size-4 transition-transform group-open:rotate-180" aria-hidden>
+                      <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="m4 6 4 4 4-4" />
+                    </svg>
+                  </span>
+                </summary>
+                <div className="px-3 pb-3 sm:px-4 sm:pb-4">
+                  <SheetPages slug={song.slug} title={song.title} sheet={song.sheet} lazy />
+                </div>
+              </details>
+            ) : (
               <SheetPages slug={song.slug} title={song.title} sheet={song.sheet} />
-            </>
-          )}
+            ))}
           {/* Tab chữ: hiện thêm nếu có; nếu không có sheet / tab tương tác thì báo đang cập nhật */}
           {!notation && (song.tab || !song.sheet) && <TabBlock tab={song.tab} />}
         </section>
@@ -132,7 +150,8 @@ function TabBlock({ tab }: { tab?: string }) {
 }
 
 /** Các trang sheet PDF (ảnh do server trả về sau khi kiểm tra quyền) phủ watermark. */
-function SheetPages({ slug, title, sheet }: { slug: string; title: string; sheet: Sheet }) {
+/** `lazy`: mọi trang tải khi cần (dùng khi sheet nằm trong khung thu gọn) */
+function SheetPages({ slug, title, sheet, lazy = false }: { slug: string; title: string; sheet: Sheet; lazy?: boolean }) {
   return (
     <div className="flex flex-col gap-4">
       {sheet.pages.map((p, i) => (
@@ -146,7 +165,7 @@ function SheetPages({ slug, title, sheet }: { slug: string; title: string; sheet
             width={p.width}
             height={p.height}
             alt={`${title} — trang ${i + 1}/${sheet.pages.length}`}
-            loading={i === 0 ? "eager" : "lazy"}
+            loading={i === 0 && !lazy ? "eager" : "lazy"}
             decoding="async"
             draggable={false}
             className="block h-auto w-full"

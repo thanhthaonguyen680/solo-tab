@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkAdminPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
+import { isValidFileNotation } from "@/lib/notation-format";
 import { NOTATION_MAX_CHARS, parseSongForm, SHEET_VERSION_PATTERN, type SongFieldErrors } from "@/lib/song-model";
 import { SONGS_TAG } from "@/lib/songs";
 
@@ -151,7 +152,11 @@ export async function commitSheet(
   }
 
   const [updated] = await sql.transaction([
-    sql`update songs set sheet_version = ${version}, notation = ${notation}, updated_at = now() where slug = ${slug} returning slug`,
+    // Tab lấy từ file Guitar Pro gốc chính xác hơn bản đọc từ PDF → giữ nguyên nếu đã có
+    sql`update songs set sheet_version = ${version},
+          notation = case when notation like '@score:%' then notation else ${notation} end,
+          updated_at = now()
+        where slug = ${slug} returning slug`,
     sql`delete from song_sheet_pages where song_slug = ${slug} and version <> ${version}`,
   ]);
   if (updated.length === 0) return { ok: false, error: "Không tìm thấy bài" };
@@ -163,9 +168,32 @@ export async function commitSheet(
 export async function removeSheet(slug: string): Promise<SheetResult> {
   await requireAdmin();
   await sql.transaction([
-    sql`update songs set sheet_version = null, notation = null, updated_at = now() where slug = ${slug}`,
+    sql`update songs set sheet_version = null,
+          notation = case when notation like '@score:%' then notation else null end,
+          updated_at = now()
+        where slug = ${slug}`,
     sql`delete from song_sheet_pages where song_slug = ${slug}`,
   ]);
+  refreshPublicPages(slug);
+  return { ok: true };
+}
+
+/** Lưu file Guitar Pro / MusicXML gốc làm tab tương tác (không đụng tới sheet PDF) */
+export async function saveScore(slug: string, notation: string): Promise<SheetResult> {
+  await requireAdmin();
+  if (typeof notation !== "string" || !isValidFileNotation(notation)) {
+    return { ok: false, error: "File tab không hợp lệ hoặc quá lớn" };
+  }
+  const rows = await sql`update songs set notation = ${notation}, updated_at = now() where slug = ${slug} returning slug`;
+  if (rows.length === 0) return { ok: false, error: "Không tìm thấy bài" };
+  refreshPublicPages(slug);
+  return { ok: true };
+}
+
+/** Bỏ tab tương tác của bài (giữ sheet PDF nếu có) */
+export async function removeScore(slug: string): Promise<SheetResult> {
+  await requireAdmin();
+  await sql`update songs set notation = null, updated_at = now() where slug = ${slug}`;
   refreshPublicPages(slug);
   return { ok: true };
 }
