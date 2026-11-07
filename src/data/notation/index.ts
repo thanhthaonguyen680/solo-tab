@@ -1,19 +1,20 @@
+import type { Song } from "@/lib/song-model";
+
 /**
- * Dữ liệu nốt (alphaTex) cho tab tương tác, theo slug bài.
+ * Dữ liệu nốt chép tay (alphaTex) theo slug — dùng khi bài chưa có tab đọc tự động từ PDF.
  * Mỗi file được tạo bằng `npm run notation -- <slug>` từ scripts/tab-audio/scores/<slug>.mjs.
- * Nạp theo yêu cầu để không gom dữ liệu mọi bài vào một chỗ.
  */
-const loaders: Record<string, () => Promise<{ notation: string }>> = {
+const handmade: Record<string, () => Promise<{ notation: string }>> = {
   "beo-dat-may-troi": () => import("./beo-dat-may-troi"),
 };
 
 /**
- * Lấy dữ liệu nốt của bài. `bpm` (ô Tempo trong admin) — nếu có — thay tempo gốc trong dữ liệu nốt,
- * để trình phát và khuông nhạc (♩ = …) dùng đúng tempo mặc định đặt cho bài.
+ * Tab tương tác của bài: ưu tiên bản đọc tự động từ sheet PDF (lưu trong database), sau đó tới bản chép tay.
+ * Ô Tempo trong admin (nếu có) thay tempo gốc, để trình phát và khuông nhạc dùng đúng tempo mặc định.
  */
-export async function getNotation(slug: string, bpm?: number): Promise<string | null> {
-  const load = loaders[slug];
-  if (!load) return null;
-  const { notation } = await load();
-  return bpm ? notation.replace(/^\\tempo \d+/m, `\\tempo ${bpm}`) : notation;
+export async function getNotation(song: Pick<Song, "slug" | "notation" | "bpm">): Promise<string | null> {
+  const load = handmade[song.slug];
+  const notation = song.notation ?? (load ? (await load()).notation : null);
+  if (!notation) return null;
+  return song.bpm ? notation.replace(/^\\tempo \d+/m, `\\tempo ${song.bpm}`) : notation;
 }

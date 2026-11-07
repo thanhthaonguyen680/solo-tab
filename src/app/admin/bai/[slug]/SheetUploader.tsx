@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import type { TabReport } from "@/lib/pdf-tab/alphatex";
+import type { PdfOps } from "@/lib/pdf-tab/geometry";
 import { SHEET_LIMITS, type Sheet } from "@/lib/song-model";
 import { commitSheet, removeSheet } from "../../actions";
 import { buttonPrimary, buttonSecondary } from "../../ui";
@@ -11,14 +13,17 @@ const TARGET_WIDTH = 1600;
 const MAX_PDF_BYTES = 40 * 1024 * 1024;
 
 type RenderedPage = { blob: Blob; url: string; width: number; height: number };
+/** Kết quả đọc tab tự động từ PDF (chỉ được với PDF xuất từ Guitar Pro) */
+type TabResult = { notation: string; report: TabReport } | { notation: null; reason: string };
+type Rendered = { pages: RenderedPage[]; tab: TabResult };
 
 type State =
   | { step: "idle" }
-  | { step: "rendering"; done: number; total: number }
-  | { step: "ready"; fileName: string; pages: RenderedPage[] }
-  | { step: "uploading"; done: number; total: number; pages: RenderedPage[] };
+  | { step: "rendering"; label: string; done: number; total: number }
+  | ({ step: "ready"; fileName: string } & Rendered)
+  | ({ step: "uploading"; done: number; total: number } & Rendered);
 
-export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) {
+export function SheetUploader({ slug, sheet, hasNotation }: { slug: string; sheet?: Sheet; hasNotation: boolean }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ step: "idle" });
@@ -39,8 +44,8 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
     if (file.size > MAX_PDF_BYTES) return setError("File PDF quá lớn (tối đa 40 MB).");
 
     try {
-      const pages = await renderPdf(file, (done, total) => setState({ step: "rendering", done, total }));
-      setState({ step: "ready", fileName: file.name, pages });
+      const rendered = await renderPdf(file, (label, done, total) => setState({ step: "rendering", label, done, total }));
+      setState({ step: "ready", fileName: file.name, ...rendered });
     } catch (e) {
       setState({ step: "idle" });
       setError(e instanceof Error ? e.message : "Không đọc được file PDF.");
@@ -49,12 +54,12 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
     }
   }
 
-  async function onUpload(pages: RenderedPage[]) {
+  async function onUpload({ pages, tab }: Rendered) {
     setError(undefined);
     const version = crypto.randomUUID();
     try {
       for (let i = 0; i < pages.length; i++) {
-        setState({ step: "uploading", done: i, total: pages.length, pages });
+        setState({ step: "uploading", done: i, total: pages.length, pages, tab });
         const body = new FormData();
         body.set("version", version);
         body.set("page", String(i + 1));
@@ -67,14 +72,17 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
           throw new Error(data.error ?? `Tải trang ${i + 1} thất bại (${res.status})`);
         }
       }
-      const result = await commitSheet(slug, version, pages.length);
+      const result = await commitSheet(slug, version, pages.length, tab.notation);
       if (!result.ok) throw new Error(result.error);
       setState({ step: "idle" });
-      setNotice(`✓ Đã lưu sheet ${pages.length} trang.`);
+      setNotice(
+        `✓ Đã lưu sheet ${pages.length} trang` +
+          (tab.notation ? ` và tab tương tác (${tab.report.bars} ô nhịp).` : "."),
+      );
       router.refresh();
     } catch (e) {
       // Giữ lại các trang đã render để bấm lưu lại; sheet cũ (nếu có) vẫn nguyên
-      setState({ step: "ready", fileName: "", pages });
+      setState({ step: "ready", fileName: "", pages, tab });
       setError(`${e instanceof Error ? e.message : "Lỗi khi tải lên"}. Sheet cũ vẫn giữ nguyên — bấm lưu để thử lại.`);
     }
   }
@@ -94,9 +102,21 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
     <section id="sheet" className="flex scroll-mt-24 flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Sheet PDF</h2>
+          <h2 className="flex flex-wrap items-center gap-2 text-xl font-semibold">
+            Sheet PDF
+            {sheet && state.step === "idle" && (
+              <span
+                className={`rounded-full border px-2 py-0.5 font-sans text-xs font-semibold ${
+                  hasNotation ? "border-accent/40 bg-fresh text-accent-ink" : "border-dashed border-border text-muted"
+                }`}
+              >
+                {hasNotation ? "Có tab tương tác" : "Chưa có tab tương tác"}
+              </span>
+            )}
+          </h2>
           <p className="text-sm text-muted">
             Mỗi trang PDF được chuyển thành ảnh ngay trên máy bạn rồi mới tải lên. Tối đa {SHEET_LIMITS.maxPages} trang.
+            PDF xuất từ Guitar Pro sẽ được đọc tự động thành tab tương tác (có tiếng, con trỏ chạy theo nốt).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -130,7 +150,7 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
         </p>
       )}
 
-      {state.step === "rendering" && <Progress label="Đang đọc PDF" done={state.done} total={state.total} />}
+      {state.step === "rendering" && <Progress label={state.label} done={state.done} total={state.total} />}
       {state.step === "uploading" && <Progress label="Đang tải lên" done={state.done} total={state.total} />}
 
       {state.step === "ready" && (
@@ -138,7 +158,7 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
           <p className="mr-auto text-sm font-semibold">
             Xem trước {state.pages.length} trang{state.fileName && ` từ “${state.fileName}”`} — kiểm tra rồi bấm lưu.
           </p>
-          <button type="button" onClick={() => onUpload(state.pages)} className={buttonPrimary}>
+          <button type="button" onClick={() => onUpload(state)} className={buttonPrimary}>
             Lưu sheet ({state.pages.length} trang)
           </button>
           <button type="button" onClick={() => setState({ step: "idle" })} className={buttonSecondary}>
@@ -146,6 +166,8 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
           </button>
         </div>
       )}
+
+      {(state.step === "ready" || state.step === "uploading") && <TabSummary tab={state.tab} />}
 
       {previews ? (
         <PageGrid urls={previews.map((p) => p.url)} />
@@ -159,6 +181,30 @@ export function SheetUploader({ slug, sheet }: { slug: string; sheet?: Sheet }) 
         )
       )}
     </section>
+  );
+}
+
+function TabSummary({ tab }: { tab: TabResult }) {
+  if (tab.notation === null) {
+    return (
+      <p className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted">
+        <span className="font-semibold text-soft">Tab tương tác: không đọc được tự động.</span> {tab.reason} Sheet vẫn được lưu
+        dạng ảnh như bình thường.
+      </p>
+    );
+  }
+  const { bars, notes, oddBars, warnings } = tab.report;
+  const issues = oddBars.length + warnings;
+  return (
+    <p className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm text-accent-ink">
+      <span className="font-semibold">🎸 Đọc được tab tương tác: {bars} ô nhịp, {notes} nốt</span> — sẽ lưu cùng sheet; trang bài
+      tự có trình phát.
+      {issues > 0 && (
+        <span className="mt-1 block text-soft">
+          Có {issues} chỗ có thể đọc chưa chuẩn{oddBars.length ? ` (ô ${oddBars.slice(0, 8).join(", ")})` : ""} — nghe thử sau khi lưu.
+        </span>
+      )}
+    </p>
   );
 }
 
@@ -192,8 +238,11 @@ function PageGrid({ urls }: { urls: string[] }) {
   );
 }
 
-/** Đọc PDF bằng pdf.js và vẽ từng trang ra ảnh (WebP, hoặc JPEG nếu trình duyệt không hỗ trợ). */
-async function renderPdf(file: File, onProgress: (done: number, total: number) => void): Promise<RenderedPage[]> {
+/**
+ * Đọc PDF bằng pdf.js: vẽ từng trang ra ảnh (WebP, hoặc JPEG nếu trình duyệt không hỗ trợ)
+ * và thử đọc tab tự động (dây, phím, trường độ) để làm tab tương tác.
+ */
+async function renderPdf(file: File, onProgress: (label: string, done: number, total: number) => void): Promise<Rendered> {
   // Bản "legacy" có polyfill — bản thường cần trình duyệt rất mới (vd. Uint8Array#toHex, Chrome 140+)
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -212,7 +261,7 @@ async function renderPdf(file: File, onProgress: (done: number, total: number) =
     }
     const pages: RenderedPage[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
-      onProgress(n - 1, doc.numPages);
+      onProgress("Đang chuyển trang thành ảnh", n - 1, doc.numPages);
       const page = await doc.getPage(n);
       const base = page.getViewport({ scale: 1 });
       const viewport = page.getViewport({ scale: Math.min(TARGET_WIDTH / base.width, 4) });
@@ -233,10 +282,28 @@ async function renderPdf(file: File, onProgress: (done: number, total: number) =
       pages.push({ blob, url: URL.createObjectURL(blob), width: canvas.width, height: canvas.height });
       page.cleanup();
     }
-    onProgress(doc.numPages, doc.numPages);
-    return pages;
+    onProgress("Đang đọc tab", doc.numPages - 1, doc.numPages);
+    return { pages, tab: await readTab(doc, pdfjs.OPS as unknown as PdfOps) };
   } finally {
     await task.destroy();
+  }
+}
+
+async function readTab(doc: Parameters<typeof import("@/lib/pdf-tab/parse").parseGuitarProPdf>[0], OPS: PdfOps): Promise<TabResult> {
+  try {
+    const [{ parseGuitarProPdf }, { reportOf, toAlphaTex }] = await Promise.all([
+      import("@/lib/pdf-tab/parse"),
+      import("@/lib/pdf-tab/alphatex"),
+    ]);
+    const parsed = await parseGuitarProPdf(doc, OPS);
+    const report = reportOf(parsed);
+    if (!report.bars || !report.notes) {
+      return { notation: null, reason: "Không tìm thấy số trên khuông tab — hiện chỉ đọc được PDF xuất từ Guitar Pro." };
+    }
+    return { notation: toAlphaTex(parsed), report };
+  } catch (e) {
+    console.error("Đọc tab từ PDF:", e);
+    return { notation: null, reason: "PDF này có cấu trúc lạ nên chưa đọc được." };
   }
 }
 

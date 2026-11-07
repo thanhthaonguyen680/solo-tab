@@ -34,7 +34,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
           ✓ Đã tạo bài. Giờ tải sheet PDF lên ở khung bên dưới (hoặc dán tab dạng chữ trong form).
         </p>
       )}
-      <SheetUploader slug={song.slug} sheet={song.sheet} />
+      <SheetUploader slug={song.slug} sheet={song.sheet} hasNotation={Boolean(song.notation)} />
       <SongForm song={song} today={song.addedAt} action={saveSong.bind(null, song.slug)} />
     </div>
   );

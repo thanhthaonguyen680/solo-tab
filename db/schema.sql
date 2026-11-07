@@ -40,3 +40,6 @@ create table if not exists song_sheet_pages (
   created_at    timestamptz not null default now(),
   primary key (song_slug, version, page)
 );
+
+-- Tab tương tác (alphaTex), đọc tự động từ sheet PDF xuất bởi Guitar Pro
+alter table songs add column if not exists notation text;

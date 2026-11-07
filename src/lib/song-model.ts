@@ -22,6 +22,8 @@ export type Song = {
   tab?: string;
   /** Sheet PDF đã chuyển thành ảnh: phiên bản đang dùng và kích thước từng trang */
   sheet?: Sheet;
+  /** Tab tương tác (alphaTex) — đọc tự động từ sheet PDF Guitar Pro khi admin tải lên */
+  notation?: string;
 };
 
 export type Sheet = {
@@ -38,6 +40,9 @@ export const SHEET_LIMITS = {
 };
 
 export const SHEET_VERSION_PATTERN = /^[a-f0-9-]{36}$/;
+
+/** Giới hạn dữ liệu tab tương tác gửi kèm khi lưu sheet */
+export const NOTATION_MAX_CHARS = 300_000;
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 

@@ -11,7 +11,7 @@ export const sql = neon(url);
 /** Cột trả về từ bảng songs, đổi tên sang camelCase */
 export const SONG_COLUMNS = `
   slug, title, artist, collection, tags, level, key, bpm,
-  audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion"`;
+  audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation`;
 
 export type SongRow = {
   slug: string;
@@ -27,6 +27,7 @@ export type SongRow = {
   free: boolean;
   addedAt: string;
   sheetVersion: string | null;
+  notation: string | null;
 };
 
 export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
@@ -44,6 +45,7 @@ export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
     free: r.free,
     addedAt: r.addedAt,
     sheet: r.sheetVersion && sheetPages.length > 0 ? { version: r.sheetVersion, pages: sheetPages } : undefined,
+    notation: r.notation ?? undefined,
   };
 }
 

@@ -7,7 +7,7 @@ import type { Song } from "./song-model";
 /** Tag cache của mọi dữ liệu bài hát — trang admin gọi updateTag(SONGS_TAG) sau khi sửa. */
 export const SONGS_TAG = "songs";
 
-export type SongSummary = Omit<Song, "tab" | "audioUrl" | "sheet"> & {
+export type SongSummary = Omit<Song, "tab" | "audioUrl" | "sheet" | "notation"> & {
   hasAudio: boolean;
   isNew: boolean;
 };
@@ -30,9 +30,10 @@ async function loadAll(): Promise<{ songs: Song[]; newest: string[] }> {
 
 /** Bản tóm tắt gửi xuống client — không kèm tab / audio để không lộ nội dung trả phí. */
 function summarize(song: Song, newest: string[]): SongSummary {
-  const { tab, audioUrl, sheet, ...rest } = song;
+  const { tab, audioUrl, sheet, notation, ...rest } = song;
   void tab;
   void sheet;
+  void notation;
   return { ...rest, hasAudio: Boolean(audioUrl), isNew: newest.includes(rest.slug) };
 }
 

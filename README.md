@@ -2,7 +2,7 @@
 
 🌐 **Website:** https://solotab.site
 
-Kho tab guitar solo & melody tiếng Việt. Mỗi bài có tab tương tác: bấm phát là đàn chơi, con trỏ chạy theo từng nốt, người tập chỉnh được tempo, lặp đoạn, bật máy đếm nhịp. Bài nào có sheet thì xem kèm sheet PDF.
+Kho tab guitar solo & melody tiếng Việt. Mỗi bài có tab tương tác: bấm phát là đàn chơi, con trỏ chạy theo từng nốt, người tập chỉnh được tempo, lặp đoạn, bật máy đếm nhịp. Admin chỉ cần tải sheet PDF xuất từ Guitar Pro lên: hệ thống tự đọc thành tab tương tác, sheet PDF vẫn hiện kèm để xem bản in.
 
 ## Tech stack
 

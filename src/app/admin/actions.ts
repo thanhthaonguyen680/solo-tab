@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkAdminPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
 import { sql } from "@/lib/db";
-import { parseSongForm, SHEET_VERSION_PATTERN, type SongFieldErrors } from "@/lib/song-model";
+import { NOTATION_MAX_CHARS, parseSongForm, SHEET_VERSION_PATTERN, type SongFieldErrors } from "@/lib/song-model";
 import { SONGS_TAG } from "@/lib/songs";
 
 // ---------- Đăng nhập ----------
@@ -125,12 +125,20 @@ export type SheetResult = { ok: true } | { ok: false; error: string };
 
 /**
  * Kích hoạt sheet vừa tải lên: chỉ khi đã có đủ `pageCount` trang liên tục 1..n.
- * Đổi version và xoá các version cũ trong cùng một transaction.
+ * Đổi version, lưu tab tương tác đọc được từ PDF (nếu có) và xoá các version cũ trong cùng một transaction.
  */
-export async function commitSheet(slug: string, version: string, pageCount: number): Promise<SheetResult> {
+export async function commitSheet(
+  slug: string,
+  version: string,
+  pageCount: number,
+  notation: string | null = null,
+): Promise<SheetResult> {
   await requireAdmin();
   if (!SHEET_VERSION_PATTERN.test(version) || !Number.isInteger(pageCount) || pageCount < 1) {
     return { ok: false, error: "Dữ liệu không hợp lệ" };
+  }
+  if (notation !== null && (typeof notation !== "string" || notation.length > NOTATION_MAX_CHARS)) {
+    return { ok: false, error: "Dữ liệu tab tương tác không hợp lệ" };
   }
 
   const [{ n, maxPage }] = await sql.query(
@@ -143,7 +151,7 @@ export async function commitSheet(slug: string, version: string, pageCount: numb
   }
 
   const [updated] = await sql.transaction([
-    sql`update songs set sheet_version = ${version}, updated_at = now() where slug = ${slug} returning slug`,
+    sql`update songs set sheet_version = ${version}, notation = ${notation}, updated_at = now() where slug = ${slug} returning slug`,
     sql`delete from song_sheet_pages where song_slug = ${slug} and version <> ${version}`,
   ]);
   if (updated.length === 0) return { ok: false, error: "Không tìm thấy bài" };
@@ -155,7 +163,7 @@ export async function commitSheet(slug: string, version: string, pageCount: numb
 export async function removeSheet(slug: string): Promise<SheetResult> {
   await requireAdmin();
   await sql.transaction([
-    sql`update songs set sheet_version = null, updated_at = now() where slug = ${slug}`,
+    sql`update songs set sheet_version = null, notation = null, updated_at = now() where slug = ${slug}`,
     sql`delete from song_sheet_pages where song_slug = ${slug}`,
   ]);
   refreshPublicPages(slug);

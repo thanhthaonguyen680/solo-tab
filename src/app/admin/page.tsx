@@ -86,6 +86,11 @@ export default async function AdminHome(props: PageProps<"/admin">) {
                           PDF · {s.sheetPageCount} trang
                         </span>
                       )}
+                      {s.notation && (
+                        <span className="rounded-full border border-accent bg-accent px-2 py-0.5 font-semibold text-accent-fg">
+                          Tab tương tác
+                        </span>
+                      )}
                       {s.sheetPageCount === 0 && (
                         <span className="rounded-full border border-dashed border-border px-2 py-0.5 font-semibold text-muted">
                           Chưa có PDF
