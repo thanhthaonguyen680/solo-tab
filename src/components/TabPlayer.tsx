@@ -29,12 +29,18 @@ export function TabPlayer({ notation }: { notation: string }) {
   const [loop, setLoop] = useState(false);
   const [metronome, setMetronome] = useState(false);
   const [countIn, setCountIn] = useState(false);
+  /** iOS cũ (chưa có Audio Session API): phát kèm audio im lặng để tiếng không bị công tắc im lặng tắt */
+  const needsSilentAudioRef = useRef(false);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     let api: AlphaTabApi | null = null;
     let cancelled = false;
+
+    // Phải đặt trước khi alphaTab tạo AudioContext
+    needsSilentAudioRef.current = !preferPlaybackAudioSession() && isIOS();
 
     (async () => {
       const alphaTab = await import("@coderline/alphatab");
@@ -79,7 +85,11 @@ export function TabPlayer({ notation }: { notation: string }) {
         setPlayerReady(true);
         setStatus({ kind: "ready" });
       });
-      api.playerStateChanged.on((e) => setPlaying(e.state === alphaTab.synth.PlayerState.Playing));
+      api.playerStateChanged.on((e) => {
+        const isPlaying = e.state === alphaTab.synth.PlayerState.Playing;
+        setPlaying(isPlaying);
+        if (!isPlaying) silentAudioRef.current?.pause();
+      });
       api.playerPositionChanged.on((e) => setTime({ current: e.currentTime, end: e.endTime }));
       api.error.on((e) => {
         console.error("alphaTab:", e);
@@ -96,8 +106,25 @@ export function TabPlayer({ notation }: { notation: string }) {
       cancelled = true;
       api?.destroy();
       apiRef.current = null;
+      const silent = silentAudioRef.current;
+      if (silent) {
+        silent.pause();
+        URL.revokeObjectURL(silent.src);
+        silentAudioRef.current = null;
+      }
     };
   }, [notation]);
+
+  function togglePlay() {
+    const api = apiRef.current;
+    if (!api) return;
+    // Gọi ngay trong sự kiện bấm (iOS chỉ cho phát âm thanh khi người dùng chạm)
+    if (needsSilentAudioRef.current && !playing) {
+      silentAudioRef.current ??= createSilentAudio();
+      silentAudioRef.current.play().catch(() => {});
+    }
+    api.playPause();
+  }
 
   function changeBpm(next: number) {
     if (!baseBpm) return;
@@ -123,7 +150,7 @@ export function TabPlayer({ notation }: { notation: string }) {
       <div className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 backdrop-blur-md">
         <button
           type="button"
-          onClick={() => apiRef.current?.playPause()}
+          onClick={togglePlay}
           disabled={!playerReady}
           aria-label={playing ? "Tạm dừng" : "Phát"}
           className="glow grid size-11 place-items-center rounded-lg bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-50 disabled:shadow-none"
@@ -233,4 +260,50 @@ function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; c
 function formatTime(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Safari trên iPhone mặc định coi Web Audio là "âm thanh nền": bật công tắc im lặng là tắt tiếng,
+ * dù nhạc vẫn chạy. Khai báo phiên "playback" (như app nghe nhạc) để luôn phát ra tiếng.
+ * Trả về false nếu trình duyệt chưa hỗ trợ Audio Session API (iOS < 16.4).
+ */
+function preferPlaybackAudioSession() {
+  const nav = navigator as Navigator & { audioSession?: { type: string } };
+  if (!nav.audioSession) return false;
+  try {
+    nav.audioSession.type = "playback";
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+}
+
+/** 0,5 giây im lặng (WAV 8 kHz, mono, 8-bit), phát lặp để Safari chuyển sang chế độ phát nhạc */
+function createSilentAudio() {
+  const samples = 4000;
+  const buf = new ArrayBuffer(44 + samples);
+  const v = new DataView(buf);
+  const str = (o: number, t: string) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, "RIFF");
+  v.setUint32(4, 36 + samples, true);
+  str(8, "WAVE");
+  str(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true);
+  v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true);
+  str(36, "data");
+  v.setUint32(40, samples, true);
+  new Uint8Array(buf, 44).fill(128);
+  const audio = new Audio(URL.createObjectURL(new Blob([buf], { type: "audio/wav" })));
+  audio.loop = true;
+  audio.setAttribute("playsinline", "");
+  return audio;
 }
