@@ -33,7 +33,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
       </div>
       {isNew && (
         <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
-          ✓ Đã tạo bài. Giờ tải sheet PDF hoặc file Guitar Pro (.gp5…) lên ở khung bên dưới.
+          ✓ Đã tạo bài. Giờ tải sheet PDF / file Guitar Pro (.gp5…) lên, hoặc bấm “Tạo tab mới” để tự soạn tab ở khung bên dưới.
         </p>
       )}
       <SheetUploader
@@ -41,7 +41,13 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
         sheet={song.sheet}
         notationSource={song.notation ? (isFileNotation(song.notation) ? "file" : "pdf") : null}
       />
-      {song.notation && <TabEditorLauncher key={song.notation.length} slug={song.slug} notation={song.notation} />}
+      <TabEditorLauncher
+        key={song.notation?.length ?? 0}
+        slug={song.slug}
+        title={song.title}
+        notation={song.notation ?? null}
+        defaultBpm={song.bpm}
+      />
       <SongForm song={song} today={song.addedAt} action={saveSong.bind(null, song.slug)} />
     </div>
   );

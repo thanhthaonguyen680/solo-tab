@@ -20,7 +20,8 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 
 ### 🛠 Trang quản trị gọn nhẹ
 - Thêm, sửa, xoá bài; đặt độ khó, tông, tempo mặc định cho từng bài.
-- **Sửa tab trực quan ngay trong admin:** bấm vào nốt trên tab rồi dùng bàn phím để đổi phím, dây, trường độ, thêm/xoá nốt, bật tiếng đập “xx”, luyến, ngân; nghe thử ngay, hoàn tác/làm lại, cảnh báo ô thiếu/thừa phách.
+- **Soạn tab mới từ đầu:** chọn cách lên dây, capo, tempo, nhịp và số ô là có ngay tab trống để điền nốt, không cần Guitar Pro.
+- **Sửa tab trực quan ngay trong admin:** bấm vào nốt hoặc dây trống rồi gõ số phím; thanh công cụ có chia đôi nốt để chèn, thêm nốt đôi / hợp âm, đổi trường độ, thêm/xoá ô nhịp, tiếng đập “xx”, luyến, ngân. Nghe thử với tempo tuỳ chỉnh, hoàn tác/làm lại, cảnh báo ô thiếu/thừa phách.
 - Sửa xong là site cập nhật ngay, không cần deploy lại.
 
 ### 📱 Dùng tốt trên điện thoại
