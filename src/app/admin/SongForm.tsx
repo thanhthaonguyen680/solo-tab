@@ -106,7 +106,7 @@ export function SongForm({ song, today, action }: Props) {
           <Field label="Tông" name="key" error={err.key}>
             <input id="key" name="key" defaultValue={v("key", song?.key)} placeholder="Am" className={inputClass} />
           </Field>
-          <Field label="Tempo (bpm)" name="bpm" error={err.bpm}>
+          <Field label="Tempo (bpm)" hint="Tempo mặc định khi phát tab tương tác" name="bpm" error={err.bpm}>
             <input
               id="bpm"
               name="bpm"

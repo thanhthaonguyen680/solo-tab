@@ -26,7 +26,7 @@ export default async function SongPage(props: PageProps<"/bai/[slug]">) {
 
   const unlocked = canViewSong(song);
   // Chỉ gửi dữ liệu nốt xuống trình duyệt khi người xem có quyền
-  const notation = unlocked ? await getNotation(song.slug) : null;
+  const notation = unlocked ? await getNotation(song.slug, song.bpm) : null;
   const collection = collections[song.collection];
 
   const meta = [
