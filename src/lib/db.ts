@@ -13,7 +13,7 @@ export const SONG_COLUMNS = `
   slug, title, artist, collection, tags, level, key, bpm,
   audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation,
   status, author_id::int as "authorId", review_note as "reviewNote",
-  (select u.name from users u where u.id = author_id) as "authorName"`;
+  (select u.username from users u where u.id = author_id) as "authorName"`;
 
 export type SongRow = {
   slug: string;

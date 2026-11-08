@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: { default: "Đóng góp tab", template: "%s · Đóng góp" },
-  description: "Đăng tab guitar bạn tự soạn lên solo.tab — tải file Guitar Pro, sheet PDF hoặc soạn ngay trên web.",
+  description: "Đẩy file PDF / Guitar Pro lên solo.tab — hệ thống tự dựng phần nhạc phát được.",
 };
 
 export default function ContributeLayout({ children }: LayoutProps<"/dong-gop">) {

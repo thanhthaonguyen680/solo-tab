@@ -44,15 +44,22 @@ create table if not exists song_sheet_pages (
 -- Tab tương tác (alphaTex), đọc tự động từ sheet PDF xuất bởi Guitar Pro
 alter table songs add column if not exists notation text;
 
--- ---------- Thành viên đóng góp (đăng nhập Google) ----------
+-- ---------- Thành viên đóng góp (tên đăng nhập + mật khẩu, không cần email) ----------
+
+-- Bản thử trước đăng nhập bằng Google (bảng còn trống) → đổi sang bảng mới một lần
+do $$ begin
+  if exists (select 1 from information_schema.columns where table_name = 'users' and column_name = 'google_sub') then
+    drop table if exists user_sessions;
+    drop table users cascade; -- bỏ luôn khoá ngoại songs.author_id, thêm lại ở dưới
+  end if;
+end $$;
 
 create table if not exists users (
   id             bigint generated always as identity primary key,
-  -- "sub" của Google: mã tài khoản không đổi (email có thể đổi)
-  google_sub     text not null unique,
-  email          text not null,
-  name           text not null,
-  avatar_url     text,
+  -- chữ thường, số, dấu chấm / gạch dưới; hiện làm tên người soạn trên trang bài
+  username       text not null unique check (username ~ '^[a-z0-9._]{3,30}$'),
+  -- "scrypt:<salt hex>:<hash hex>"
+  password_hash  text not null,
   is_banned      boolean not null default false,
   created_at     timestamptz not null default now(),
   last_login_at  timestamptz not null default now()
@@ -72,7 +79,10 @@ alter table songs add column if not exists status text not null default 'publish
 do $$ begin
   alter table songs add constraint songs_status_check check (status in ('draft', 'pending', 'published', 'rejected'));
 exception when duplicate_object then null; end $$;
-alter table songs add column if not exists author_id bigint references users (id) on delete set null;
+alter table songs add column if not exists author_id bigint;
+do $$ begin
+  alter table songs add constraint songs_author_id_fkey foreign key (author_id) references users (id) on delete set null;
+exception when duplicate_object then null; end $$;
 alter table songs add column if not exists review_note text;
 alter table songs add column if not exists submitted_at timestamptz;
 create index if not exists songs_author_idx on songs (author_id);

@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { buttonPrimary } from "@/components/buttons";
 import { StatusBadge } from "@/components/StatusBadge";
-import { collections, site } from "@/config/site";
-import { getMember } from "@/lib/member-auth";
+import { collections } from "@/config/site";
+import { requireMember } from "@/lib/member-auth";
 import { listMySongs } from "@/lib/member-songs";
+import { deleteContribution } from "./actions";
+import { ContributeUploader } from "./ContributeUploader";
 import { MemberBar } from "./MemberBar";
 
-export default async function ContributePage(props: PageProps<"/dong-gop">) {
-  const member = await getMember();
-  if (!member) return <Landing />;
-
+export default async function ContributePage() {
+  // Bấm "Đóng góp" khi chưa đăng nhập → sang trang đăng nhập / đăng ký rồi quay lại đây
+  const member = await requireMember("/dong-gop");
   const songs = await listMySongs(member);
-  const deleted = (await props.searchParams)["da-xoa"] === "1";
 
   return (
     <div className="flex flex-col gap-6">
@@ -19,75 +18,57 @@ export default async function ContributePage(props: PageProps<"/dong-gop">) {
         <div>
           <p className="eyebrow">Đóng góp</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Tab <span className="highlight">của tôi</span>
+            Gửi tab <span className="highlight">của bạn</span>
           </h1>
         </div>
         <MemberBar member={member} />
       </div>
 
-      {deleted && (
-        <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
-          ✓ Đã xoá bài.
-        </p>
-      )}
+      <ContributeUploader />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5">
-        <p className="text-sm text-muted">
-          Tạo bài → thêm tab (file Guitar Pro, sheet PDF hoặc tự soạn trên web) → <b className="text-soft">Gửi duyệt</b>. Bài được
-          duyệt sẽ hiện trên {site.name} kèm tên bạn.
-        </p>
-        <Link href="/dong-gop/moi" className={buttonPrimary()}>
-          + Gửi tab mới
-        </Link>
-      </div>
-
-      {songs.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-10 text-center text-muted">Bạn chưa gửi bài nào.</p>
-      ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-border bg-surface">
-          {songs.map((s) => (
-            <li key={s.slug}>
-              <Link
-                href={s.status === "published" ? `/bai/${s.slug}` : `/dong-gop/${s.slug}`}
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{s.title}</p>
-                  <p className="text-sm text-muted">
-                    {collections[s.collection].title} · {s.level}
-                    {s.notation ? " · có tab tương tác" : ""}
-                    {s.sheetPageCount ? ` · PDF ${s.sheetPageCount} trang` : ""}
-                  </p>
+      <section className="flex flex-col gap-3" aria-label="Bài đã gửi">
+        <h2 className="text-xl font-semibold">Bài bạn đã gửi</h2>
+        {songs.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border p-8 text-center text-muted">Chưa có bài nào.</p>
+        ) : (
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-border bg-surface">
+            {songs.map((s) => (
+              <li key={s.slug} className="flex flex-col gap-2 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    {s.status === "published" ? (
+                      <Link href={`/bai/${s.slug}`} className="font-semibold underline-offset-4 hover:text-accent-ink hover:underline">
+                        {s.title}
+                      </Link>
+                    ) : (
+                      <p className="font-semibold">{s.title}</p>
+                    )}
+                    <p className="text-sm text-muted">
+                      {collections[s.collection].title} · {s.level}
+                      {s.artist ? ` · ${s.artist}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {s.status && <StatusBadge status={s.status} />}
+                    {s.status !== "published" && (
+                      <form action={deleteContribution.bind(null, s.slug)}>
+                        <button type="submit" className="text-sm text-muted underline-offset-4 hover:text-red-300 hover:underline">
+                          Xoá
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </div>
-                {s.status && <StatusBadge status={s.status} />}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function Landing() {
-  return (
-    <div className="mx-auto flex max-w-2xl flex-col items-start gap-6 py-6">
-      <p className="eyebrow">Đóng góp</p>
-      <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-        Đăng tab <span className="highlight">bạn tự soạn</span>
-      </h1>
-      <p className="text-lg text-muted">
-        Có bản solo hay bạn tự soạn? Đăng lên {site.name} để mọi người cùng tập — tab tương tác phát nhạc theo từng nốt, kèm tên
-        bạn trên trang bài.
-      </p>
-      <ul className="flex flex-col gap-2 text-soft">
-        <li>🎸 Tải lên file <b>Guitar Pro</b> (.gp, .gp5…) hoặc <b>sheet PDF</b> — tự chuyển thành tab tương tác</li>
-        <li>✍️ Hoặc <b>soạn tab ngay trên web</b>: bấm vào dây, gõ số phím, nghe thử</li>
-        <li>✅ Bài được kiểm duyệt trước khi đăng để giữ chất lượng kho tab</li>
-      </ul>
-      <Link href="/dang-nhap?next=/dong-gop" className={buttonPrimary("lg")}>
-        Đăng nhập để bắt đầu
-      </Link>
+                {s.status === "rejected" && s.reviewNote && (
+                  <p className="rounded-lg border-l-4 border-red-400 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                    <b>Admin nhắn:</b> {s.reviewNote}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

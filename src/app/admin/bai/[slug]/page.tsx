@@ -40,7 +40,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
         <section className="flex flex-col gap-3 rounded-2xl border border-amber-400/40 bg-amber-400/5 p-5" aria-label="Duyệt bài">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm">
-              Bài thành viên gửi: <b>{author.name}</b> <span className="text-muted">({author.email} · thành viên từ {author.since})</span>
+              Bài thành viên gửi: <b>{author.name}</b> <span className="text-muted">(thành viên từ {author.since})</span>
             </p>
             <StatusBadge status={status} />
           </div>

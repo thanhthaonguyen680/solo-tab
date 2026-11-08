@@ -2,9 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import type { TabReport } from "@/lib/pdf-tab/alphatex";
-import type { PdfOps } from "@/lib/pdf-tab/geometry";
-import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS, SCORE_FILE_MAX_BYTES } from "@/lib/notation-format";
+import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS } from "@/lib/notation-format";
+import { openPdf, readScoreFile, readTab, type ScoreFile, type TabResult } from "@/lib/score-reader";
 import { SHEET_LIMITS, type Sheet } from "@/lib/song-model";
 import { commitSheet, removeScore, removeSheet, saveScore } from "@/lib/song-content-actions";
 import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
@@ -14,19 +13,7 @@ const TARGET_WIDTH = 1600;
 const MAX_PDF_BYTES = 40 * 1024 * 1024;
 
 type RenderedPage = { blob: Blob; url: string; width: number; height: number };
-/** Kết quả đọc tab tự động từ PDF (chỉ được với PDF xuất từ Guitar Pro) */
-type TabResult = { notation: string; report: TabReport } | { notation: null; reason: string };
 type Rendered = { pages: RenderedPage[]; tab: TabResult };
-
-/** File Guitar Pro / MusicXML đã đọc thử bằng alphaTab */
-type ScoreFile = {
-  fileName: string;
-  bytes: Uint8Array;
-  title: string;
-  tempo: number;
-  bars: number;
-  tracks: { index: number; name: string; notes: number }[];
-};
 
 /** Tab tương tác hiện có của bài: từ file Guitar Pro gốc, đọc từ PDF, hoặc chưa có */
 export type NotationSource = "file" | "pdf" | null;
@@ -291,28 +278,6 @@ export function SheetUploader({ slug, sheet, notationSource }: { slug: string; s
 }
 
 /** Đọc thử file Guitar Pro / MusicXML bằng alphaTab để báo thông tin trước khi lưu */
-async function readScoreFile(file: File): Promise<ScoreFile> {
-  if (file.size > SCORE_FILE_MAX_BYTES) throw new Error(`File quá lớn (tối đa ${SCORE_FILE_MAX_BYTES / 1024} KB).`);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const alphaTab = await import("@coderline/alphatab");
-  let score;
-  try {
-    score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(bytes);
-  } catch (e) {
-    console.error("alphaTab:", e);
-    throw new Error("Không đọc được file tab (file hỏng hoặc định dạng chưa hỗ trợ).");
-  }
-  const tracks = score.tracks
-    .filter((t) => !t.isPercussion)
-    .map((t) => ({
-      index: t.index,
-      name: t.name || `Track ${t.index + 1}`,
-      notes: t.staves.reduce((n, st) => n + st.bars.reduce((m, b) => m + b.voices.reduce((k, v) => k + v.beats.reduce((j, beat) => j + beat.notes.length, 0), 0), 0), 0),
-    }));
-  if (!tracks.length) throw new Error("File không có track nhạc cụ nào để hiển thị.");
-  return { fileName: file.name, bytes, title: score.title || file.name, tempo: score.tempo, bars: score.masterBars.length, tracks };
-}
-
 function TabSummary({ tab }: { tab: TabResult }) {
   if (tab.notation === null) {
     return (
@@ -372,19 +337,8 @@ function PageGrid({ urls }: { urls: string[] }) {
  * và thử đọc tab tự động (dây, phím, trường độ) để làm tab tương tác.
  */
 async function renderPdf(file: File, onProgress: (label: string, done: number, total: number) => void): Promise<Rendered> {
-  // Bản "legacy" có polyfill — bản thường cần trình duyệt rất mới (vd. Uint8Array#toHex, Chrome 140+)
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-    import.meta.url,
-  ).toString();
-
-  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  const { doc, task, OPS } = await openPdf(file);
   try {
-    const doc = await task.promise.catch((e: unknown) => {
-      console.error("pdf.js:", e instanceof Error ? `${e.name}: ${e.message}` : String(e));
-      throw new Error("Không đọc được file PDF (file hỏng hoặc có mật khẩu)");
-    });
     if (doc.numPages > SHEET_LIMITS.maxPages) {
       throw new Error(`PDF có ${doc.numPages} trang — tối đa ${SHEET_LIMITS.maxPages} trang.`);
     }
@@ -412,27 +366,9 @@ async function renderPdf(file: File, onProgress: (label: string, done: number, t
       page.cleanup();
     }
     onProgress("Đang đọc tab", doc.numPages - 1, doc.numPages);
-    return { pages, tab: await readTab(doc, pdfjs.OPS as unknown as PdfOps) };
+    return { pages, tab: await readTab(doc, OPS) };
   } finally {
     await task.destroy();
-  }
-}
-
-async function readTab(doc: Parameters<typeof import("@/lib/pdf-tab/parse").parseGuitarProPdf>[0], OPS: PdfOps): Promise<TabResult> {
-  try {
-    const [{ parseGuitarProPdf }, { reportOf, toAlphaTex }] = await Promise.all([
-      import("@/lib/pdf-tab/parse"),
-      import("@/lib/pdf-tab/alphatex"),
-    ]);
-    const parsed = await parseGuitarProPdf(doc, OPS);
-    const report = reportOf(parsed);
-    if (!report.bars || !report.notes) {
-      return { notation: null, reason: "Không tìm thấy số trên khuông tab — hiện chỉ đọc được PDF xuất từ Guitar Pro." };
-    }
-    return { notation: toAlphaTex(parsed), report };
-  } catch (e) {
-    console.error("Đọc tab từ PDF:", e);
-    return { notation: null, reason: "PDF này có cấu trúc lạ nên chưa đọc được." };
   }
 }
 

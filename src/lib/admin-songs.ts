@@ -18,8 +18,8 @@ export async function listSongsForAdmin(): Promise<(Song & { sheetPageCount: num
 /** Thông tin người gửi bài (cho admin duyệt) */
 export async function getAuthorForAdmin(authorId: number) {
   await requireAdmin();
-  const [row] = await sql`select name, email, created_at::date::text as "since" from users where id = ${authorId}`;
-  return row as { name: string; email: string; since: string } | undefined;
+  const [row] = await sql`select username as name, created_at::date::text as "since" from users where id = ${authorId}`;
+  return row as { name: string; since: string } | undefined;
 }
 
 export async function getSongForAdmin(slug: string): Promise<Song | undefined> {
