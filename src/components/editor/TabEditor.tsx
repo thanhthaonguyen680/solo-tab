@@ -66,8 +66,15 @@ export function TabEditor({
   const bpmRef = useRef<{ base: number; current: number | null }>({ base: 120, current: null });
   /** Trường độ / trạng thái của beat đang chọn — để tô sáng nút trên thanh công cụ */
   const [sel, setSel] = useState<{ duration: number; dots: number; note: boolean } | null>(null);
-  /** Vị trí con trỏ chuột lúc bấm (toạ độ trong vùng vẽ) — để biết đã bấm vào dây nào */
-  const pointRef = useRef<{ x: number; y: number } | null>(null);
+  /** Vị trí con trỏ chuột lúc bấm (toạ độ trong vùng vẽ) — để biết đã bấm vào dây nào; shift = đang chọn nhiều ô */
+  const pointRef = useRef<{ x: number; y: number; shift: boolean } | null>(null);
+  /** Chọn nhiều ô: từ ô `anchor` tới ô của con trỏ (Shift + bấm, Shift + ← →) */
+  const rangeRef = useRef<{ anchor: number } | null>(null);
+  const rangeBoxRef = useRef<HTMLDivElement>(null);
+  const [span, setSpan] = useState<[number, number]>([0, 0]);
+  /** Các ô đã chép: lưu cả bản nhạc lúc chép (Guitar Pro 7) + khoảng ô — dán bao nhiêu lần cũng được */
+  const clipRef = useRef<{ bytes: Uint8Array; from: number; to: number } | null>(null);
+  const [clipCount, setClipCount] = useState(0);
 
   // ---------- Truy cập mô hình ----------
   const staff = () => apiRef.current?.score?.tracks[trackRef.current]?.staves[0] ?? null;
@@ -76,6 +83,11 @@ export function TabEditor({
   const toModel = (s: number) => stringCount() - s + 1;
   const beatAt = (c: Cursor): Beat | null => staff()?.bars[c.bar]?.voices[0]?.beats[c.beat] ?? null;
   const noteAt = (c: Cursor): Note | null => beatAt(c)?.notes.find((n) => n.string === toModel(c.string)) ?? null;
+  /** Khoảng ô đang chọn [đầu, cuối]; không chọn nhiều thì là ô của con trỏ */
+  const barSpan = (): [number, number] => {
+    const c = cursorRef.current.bar, r = rangeRef.current;
+    return r ? [Math.min(r.anchor, c), Math.max(r.anchor, c)] : [c, c];
+  };
   const openPitch = (tabString: number) => {
     const st = staff();
     return st ? st.tuning[tabString - 1] + st.capo : 0;
@@ -87,6 +99,24 @@ export function TabEditor({
     if (!api || !box) return;
     const beat = beatAt(c);
     const lookup = api.renderer.boundsLookup;
+    // toạ độ alphaTab tính theo vùng vẽ (host); khung chọn nằm cạnh host nên cộng thêm vị trí của host
+    const host = hostRef.current;
+    const ox = host?.offsetLeft ?? 0, oy = host?.offsetTop ?? 0;
+    // tô các ô đang chọn (khi chọn nhiều ô)
+    const [from, to] = barSpan();
+    setSpan([from, to]);
+    const rb = rangeBoxRef.current;
+    if (rb) {
+      rb.replaceChildren();
+      for (let i = from; rangeRef.current && i <= to; i++) {
+        const v = lookup?.findMasterBarByIndex(i)?.visualBounds;
+        if (!v) continue;
+        const d = document.createElement("div");
+        d.className = "absolute rounded-md border border-accent/60 bg-accent/10";
+        Object.assign(d.style, { left: `${ox + v.x}px`, top: `${oy + v.y}px`, width: `${v.w}px`, height: `${v.h}px` });
+        rb.appendChild(d);
+      }
+    }
     // Một beat có vị trí ở cả khuông nhạc lẫn khuông tab → lấy khuông tab (nằm dưới cùng)
     const all = beat && lookup ? lookup.findBeats(beat) ?? [] : [];
     const bb = all.sort((a, b) => b.visualBounds.y - a.visualBounds.y)[0];
@@ -104,19 +134,16 @@ export function TabEditor({
       const gap = line.h / Math.max(1, stringCount() - 1);
       r = { x: v.x - 2, y: line.y + (c.string - 1) * gap - gap / 2, w: Math.max(v.w, 14) + 4, h: gap };
     }
-    // toạ độ alphaTab tính theo vùng vẽ (host); khung chọn nằm cạnh host nên cộng thêm vị trí của host
-    const host = hostRef.current;
-    const ox = host?.offsetLeft ?? 0, oy = host?.offsetTop ?? 0;
     Object.assign(box.style, { display: "block", left: `${ox + r.x}px`, top: `${oy + r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
     const dur = `${DURATION_NAME[beat.duration] ?? beat.duration}${beat.dots ? " chấm" : ""}`;
     const what = note
       ? note.isDead ? "X (đập/chặn dây)" : `phím ${note.fret}${note.slideOutType ? " · luyến" : ""}${note.isLetRing ? " · ngân" : ""}`
       : `${beat.isRest ? "dấu lặng" : "dây trống"} → gõ số để thêm nốt`;
-    const mb = beat.voice.bar.masterBar;
-    const gap = beat.voice.beats.reduce((s, b) => s + b.playbackDuration, 0) - (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator;
+    const gap = voiceTicks(beat.voice) - barCapacity(beat.voice.bar.masterBar);
     // trạng thái phách để ngay đầu (dòng này bị cắt bớt khi màn hình hẹp)
     const barState = gap === 0 ? "" : ` (⚠ ${gap < 0 ? "thiếu" : "thừa"} ${formatBeats(Math.abs(gap))})`;
-    setInfo(`Ô ${c.bar + 1}${barState} · beat ${c.beat + 1} · dây ${c.string} · ${what} · ${dur}`);
+    const picked = to > from ? `[Chọn ô ${from + 1}–${to + 1}] ` : "";
+    setInfo(`${picked}Ô ${c.bar + 1}${barState} · beat ${c.beat + 1} · dây ${c.string} · ${what} · ${dur}`);
   }, []);
 
   const setCursor = useCallback((c: Cursor) => {
@@ -130,10 +157,8 @@ export function TabEditor({
     if (!st) return;
     const out: { bar: number; diff: number }[] = [];
     st.bars.forEach((bar, i) => {
-      const mb = bar.masterBar;
-      const want = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator;
-      const have = bar.voices[0].beats.reduce((s, b) => s + b.playbackDuration, 0);
-      if (have !== want) out.push({ bar: i, diff: have - want });
+      const diff = voiceTicks(bar.voices[0]) - barCapacity(bar.masterBar);
+      if (diff !== 0) out.push({ bar: i, diff });
     });
     setWarnings(out);
   }, []);
@@ -181,12 +206,18 @@ export function TabEditor({
       api.postRenderFinished.on(() => drawSelection());
       api.playerStateChanged.on((e) => setPlaying(e.state === alphaTab.synth.PlayerState.Playing));
       // alphaTab báo beatMouseDown trước, rồi noteMouseDown nếu trúng nốt → nốt ghi đè lựa chọn theo beat
+      // Shift + bấm: chọn từ ô đang chọn tới ô vừa bấm; bấm thường: bỏ chọn nhiều ô
+      const pickRange = () => {
+        rangeRef.current = pointRef.current?.shift ? { anchor: rangeRef.current?.anchor ?? cursorRef.current.bar } : null;
+      };
       api.noteMouseDown.on((note) => {
+        pickRange();
         const beat = note.beat;
         setCursor({ bar: beat.voice.bar.index, beat: beat.index, string: stringCount() - note.string + 1 });
         host.focus();
       });
       api.beatMouseDown.on((beat) => {
+        pickRange();
         // bấm vào chỗ trống trên khuông tab → chọn đúng dây đó (để thêm nốt đôi / hợp âm)
         let string = cursorRef.current.string;
         const p = pointRef.current;
@@ -236,11 +267,40 @@ export function TabEditor({
   };
 
   // ---------- Áp dụng một thay đổi ----------
-  const commit = useCallback((mutate: () => boolean | void) => {
+  /**
+   * Sửa mô hình → tự dồn phách (như Guitar Pro) → lưu lịch sử → nạp lại.
+   * Trả về hàm đổi vị trí con trỏ (tính trước lúc dồn) sang vị trí mới, vì beat có thể đã bị đẩy sang ô sau.
+   */
+  const commit = useCallback((mutate: () => boolean | void, from = cursorRef.current.bar): ((c: Cursor) => Cursor) | undefined => {
     const api = apiRef.current, lib = libRef.current;
-    if (!api?.score || !lib) return;
+    const score = api?.score;
+    if (!api || !score || !lib) return;
+    const st = score.tracks[trackRef.current]?.staves[0];
+    const old = new Set(st?.bars.flatMap((b) => b.voices[0].beats));
     if (mutate() === false) return;
-    const bytes = new lib.exporter.Gp7Exporter().export(api.score, null);
+    // vị trí các beat ngay trước khi dồn → tìm lại beat sau khi dồn
+    const before = st ? st.bars.map((b) => [...b.voices[0].beats]) : [];
+    // beat vừa chèn / đang chọn không bị coi là dấu lặng thừa để bớt
+    const c0 = cursorRef.current;
+    const keep = new Set(before.flat().filter((b) => !old.has(b)));
+    const cur = before[c0.bar]?.[c0.beat];
+    if (cur) keep.add(cur);
+    const flow = st ? reflow(lib, score, st, from, keep) : null;
+    const relocate = (c: Cursor): Cursor => {
+      const b = before[c.bar]?.[c.beat];
+      if (!flow || !b) return c;
+      const i = b.voice.beats.indexOf(b);
+      if (i >= 0) return { ...c, bar: b.voice.bar.index, beat: i };
+      return { ...c, beat: Math.max(0, Math.min(c.beat, (st?.bars[c.bar]?.voices[0].beats.length ?? 1) - 1)) };
+    };
+    if (flow) {
+      const c = relocate(cursorRef.current);
+      cursorRef.current = c;
+      setCursorState(c);
+      setMessage(flow);
+    }
+    renumber(score);
+    const bytes = new lib.exporter.Gp7Exporter().export(score, null);
     const h = historyRef.current;
     h.stack = [...h.stack.slice(0, h.at + 1), bytes].slice(-HISTORY_LIMIT);
     h.at = h.stack.length - 1;
@@ -248,6 +308,7 @@ export function TabEditor({
     setCanRedo(false);
     setDirty(true);
     api.load(bytes, [trackRef.current]);
+    return relocate;
   }, []);
 
   const travel = useCallback((dir: -1 | 1) => {
@@ -293,7 +354,9 @@ export function TabEditor({
     if (!x?.beat || !x.voice) return;
     const { lib, c, beat, voice } = x;
     const at = c.beat + (after ? 1 : 0);
-    commit(() => {
+    // ghi chú trước: nếu ô bị thừa phách và được dồn, lời báo dồn phách sẽ thay chỗ này
+    setMessage("Đã chèn beat trống. Chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím để đặt nốt.");
+    const relocate = commit(() => {
       const nb = new lib.model.Beat();
       nb.duration = beat.duration;
       nb.dots = beat.dots;
@@ -301,8 +364,8 @@ export function TabEditor({
       nb.voice = voice;
       voice.beats.splice(at, 0, nb);
     });
-    setCursor({ ...c, beat: at });
-    setMessage("Đã chèn beat trống. Chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím để đặt nốt.");
+    const next = { ...c, beat: at };
+    setCursor(relocate ? relocate(next) : next);
   };
 
   /** Chia beat đang chọn thành 2 beat ngắn bằng nửa — tổng phách giữ nguyên, beat sau để trống để chèn nốt */
@@ -312,7 +375,8 @@ export function TabEditor({
     const { lib, c, beat, voice } = x;
     const i = DURATIONS.indexOf(beat.duration);
     if (i < 0 || i >= DURATIONS.length - 1) { setMessage("Nốt này đã ngắn nhất (móc ba), không chia được nữa."); return; }
-    commit(() => {
+    setMessage(`Đã chia đôi thành 2 ${DURATION_NAME[DURATIONS[i + 1]]}. Beat sau đang trống: chọn dây rồi gõ số phím để chèn nốt.`);
+    const relocate = commit(() => {
       beat.duration = DURATIONS[i + 1];
       const nb = new lib.model.Beat();
       nb.duration = beat.duration;
@@ -321,8 +385,8 @@ export function TabEditor({
       nb.voice = voice;
       voice.beats.splice(c.beat + 1, 0, nb);
     });
-    setCursor({ ...c, beat: c.beat + 1 });
-    setMessage(`Đã chia đôi thành 2 ${DURATION_NAME[DURATIONS[i + 1]]}. Beat sau đang trống: chọn dây rồi gõ số phím để chèn nốt.`);
+    const next = { ...c, beat: c.beat + 1 };
+    setCursor(relocate ? relocate(next) : next);
   };
 
   const setDuration = (d: number) => {
@@ -357,23 +421,6 @@ export function TabEditor({
     setCursor({ ...c, beat: Math.max(0, c.beat - 1) });
   };
 
-  /** Đánh lại chỉ số / liên kết ô sau khi thêm hoặc xoá ô (để xuất file đúng thứ tự) */
-  const relinkBars = (score: model.Score) => {
-    score.masterBars.forEach((m, i) => {
-      m.index = i;
-      m.score = score;
-      m.previousMasterBar = score.masterBars[i - 1] ?? null;
-      m.nextMasterBar = score.masterBars[i + 1] ?? null;
-    });
-    for (const tr of score.tracks)
-      for (const s of tr.staves)
-        s.bars.forEach((b, i) => {
-          b.index = i;
-          b.previousBar = s.bars[i - 1] ?? null;
-          b.nextBar = s.bars[i + 1] ?? null;
-        });
-  };
-
   /**
    * Ô chưa đủ phách → thêm một dấu lặng vào cuối ô (cùng trường độ với nốt cuối nếu vừa, không thì lấp vừa đủ)
    * rồi chọn nó để gõ tiếp. Trả về false nếu ô đã đủ phách.
@@ -381,8 +428,7 @@ export function TabEditor({
   const appendBeat = (barIndex: number) => {
     const lib = libRef.current, voice = staff()?.bars[barIndex]?.voices[0];
     if (!lib || !voice) return false;
-    const mb = voice.bar.masterBar;
-    const missing = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator - voice.beats.reduce((s, b) => s + b.playbackDuration, 0);
+    const missing = barCapacity(voice.bar.masterBar) - voiceTicks(voice);
     if (missing <= 0) return false;
     const last = voice.beats[voice.beats.length - 1];
     const duration = last && 3840 / last.duration <= missing ? last.duration : DURATIONS.find((d) => 3840 / d <= missing);
@@ -404,29 +450,7 @@ export function TabEditor({
     if (!x || !score) return;
     const { lib, c } = x;
     const at = c.bar + 1;
-    const ref = score.masterBars[c.bar];
-    commit(() => {
-      const mb = new lib.model.MasterBar();
-      mb.timeSignatureNumerator = ref.timeSignatureNumerator;
-      mb.timeSignatureDenominator = ref.timeSignatureDenominator;
-      score.masterBars.splice(at, 0, mb);
-      const grid = Math.max(8, ref.timeSignatureDenominator);
-      const count = Math.max(1, Math.round((ref.timeSignatureNumerator * grid) / ref.timeSignatureDenominator));
-      for (const tr of score.tracks)
-        for (const s of tr.staves) {
-          const bar = new lib.model.Bar();
-          bar.staff = s;
-          const v = new lib.model.Voice();
-          bar.addVoice(v);
-          for (let i = 0; i < count; i++) {
-            const b = new lib.model.Beat();
-            b.duration = grid;
-            v.addBeat(b);
-          }
-          s.bars.splice(at, 0, bar);
-        }
-      relinkBars(score);
-    });
+    commit(() => addBar(lib, score, at, score.masterBars[c.bar]));
     setCursor({ bar: at, beat: 0, string: c.string });
     setMessage(`Đã thêm ô ${at + 1}.`);
   };
@@ -445,26 +469,54 @@ export function TabEditor({
     setCursor({ bar: Math.min(c.bar, score.masterBars.length - 1), beat: 0, string: c.string });
   };
 
+  /** Chép các ô đang chọn (một ô, hoặc nhiều ô khi giữ Shift) */
+  const copyBars = () => {
+    const api = apiRef.current, lib = libRef.current;
+    if (!api?.score || !lib) return;
+    const [from, to] = barSpan();
+    clipRef.current = { bytes: new lib.exporter.Gp7Exporter().export(api.score, null), from, to };
+    setClipCount(to - from + 1);
+    const what = to > from ? `ô ${from + 1}–${to + 1}` : `ô ${from + 1}`;
+    setMessage(`Đã chép ${what}. Bấm vào ô cần dán rồi chọn “Dán đè” (⌘/Ctrl + V) để thay nốt trong ô đó, hoặc “Dán chèn” (Shift + ⌘/Ctrl + V) để thêm thành ô mới phía sau.`);
+  };
+
+  /** Dán các ô đã chép: đè lên từ ô đang chọn trở đi (thiếu ô thì thêm), hoặc chèn thành ô mới ngay sau ô đang chọn */
+  const pasteBars = (insert: boolean) => {
+    const x = context(), score = apiRef.current?.score, clip = clipRef.current;
+    if (!x || !score || !clip) return;
+    const { lib, st, c } = x;
+    const src = lib.importer.ScoreLoader.loadScoreFromBytes(clip.bytes).tracks[trackRef.current]?.staves[0];
+    if (!src) return;
+    const n = clip.to - clip.from + 1;
+    const at = insert ? c.bar + 1 : c.bar;
+    const ref = score.masterBars[c.bar];
+    commit(() => {
+      for (let k = 0; k < n; k++) {
+        const i = at + k;
+        if (insert || i >= st.bars.length) addBar(lib, score, i, ref);
+        const voice = st.bars[i].voices[0];
+        // beat của bản chép là đối tượng mới (vừa đọc lại từ file) → chuyển thẳng sang ô đích
+        const beats = src.bars[clip.from + k]?.voices[0].beats ?? [];
+        if (!beats.length) continue;
+        voice.beats.length = 0;
+        for (const b of beats) voice.addBeat(b); // addBeat còn đánh dấu ô "có nội dung" → không bị bỏ khi xuất file
+      }
+    }, at);
+    rangeRef.current = null;
+    // con trỏ sang ô ngay sau phần vừa dán → dán tiếp được liền
+    setCursor({ bar: Math.min(at + n, st.bars.length - 1), beat: 0, string: c.string });
+    const where = n > 1 ? `ô ${at + 1}–${at + n}` : `ô ${at + 1}`;
+    setMessage(`Đã ${insert ? "chèn" : "dán đè"} vào ${where}. Dán nhầm thì bấm Hoàn tác (⌘/Ctrl + Z).`);
+  };
+
   /** Bù phần thiếu của một ô bằng dấu lặng — ở đầu ô (nốt dồn về cuối, nối liền ô sau) hoặc ở cuối ô */
   const fillBar = (barIndex: number, atStart: boolean) => {
     const lib = libRef.current, st = staff();
     const voice = st?.bars[barIndex]?.voices[0];
     if (!lib || !st || !voice) return;
-    const mb = st.bars[barIndex].masterBar;
-    let missing = (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator - voice.beats.reduce((s, b) => s + b.playbackDuration, 0);
+    const missing = barCapacity(st.bars[barIndex].masterBar) - voiceTicks(voice);
     if (missing <= 0) return;
-    const rests: model.Beat[] = [];
-    for (const d of DURATIONS) {
-      const ticks = 3840 / d;
-      while (missing >= ticks) {
-        const r = new lib.model.Beat();
-        r.duration = d;
-        r.isEmpty = false;
-        r.voice = voice;
-        rests.push(r);
-        missing -= ticks;
-      }
-    }
+    const rests = restsFor(lib, voice, missing);
     if (!rests.length) return;
     commit(() => {
       if (atStart) voice.beats.splice(0, 0, ...rests);
@@ -522,12 +574,25 @@ export function TabEditor({
 
     if (mod && key.toLowerCase() === "z") { handled(); travel(e.shiftKey ? 1 : -1); return; }
     if (mod && key.toLowerCase() === "y") { handled(); travel(1); return; }
+    if (mod && key.toLowerCase() === "c") { handled(); copyBars(); return; }
+    if (mod && key.toLowerCase() === "v") { handled(); pasteBars(e.shiftKey); return; }
     if (mod) return;
     if (key === " ") { handled(); apiRef.current?.playPause(); return; }
+    if (key === "Escape" && rangeRef.current) { handled(); rangeRef.current = null; setCursor(c); return; }
 
+    // Shift + ← →: chọn thêm / bớt từng ô (để chép nhiều ô)
+    if ((key === "ArrowLeft" || key === "ArrowRight") && e.shiftKey) {
+      handled();
+      const bar = c.bar + (key === "ArrowLeft" ? -1 : 1);
+      if (bar < 0 || bar >= st.bars.length) return;
+      rangeRef.current = { anchor: rangeRef.current?.anchor ?? c.bar };
+      setCursor({ bar, beat: 0, string: c.string });
+      return;
+    }
     // Di chuyển
     if (key === "ArrowLeft" || key === "ArrowRight") {
       handled();
+      rangeRef.current = null;
       const d = key === "ArrowLeft" ? -1 : 1;
       let { bar, beat: bi } = c;
       bi += d;
@@ -718,6 +783,15 @@ export function TabEditor({
           <ToolGroup label="Ô nhịp">
             <Chip onClick={() => run(insertBar)} disabled={!sel} title="Thêm một ô trống ngay sau ô đang chọn">+ Ô sau</Chip>
             <Chip onClick={() => run(deleteBar)} disabled={!sel} title="Xoá ô đang chọn">Xoá ô</Chip>
+            <Chip onClick={() => run(copyBars)} disabled={!sel} title="Chép ô đang chọn (⌘/Ctrl + C). Chép nhiều ô: giữ Shift rồi bấm sang ô khác, hoặc Shift + ← →">
+              {span[1] > span[0] ? `Chép ${span[1] - span[0] + 1} ô` : "Chép ô"}
+            </Chip>
+            <Chip onClick={() => run(() => pasteBars(false))} disabled={!sel || !clipCount} title="Dán đè các ô đã chép lên ô đang chọn trở đi (⌘/Ctrl + V)">
+              Dán đè{clipCount > 1 ? ` ${clipCount} ô` : ""}
+            </Chip>
+            <Chip onClick={() => run(() => pasteBars(true))} disabled={!sel || !clipCount} title="Chèn các ô đã chép thành ô mới ngay sau ô đang chọn (Shift + ⌘/Ctrl + V)">
+              Dán chèn
+            </Chip>
           </ToolGroup>
           <ToolGroup label="Kỹ thuật">
             <Chip onClick={() => run(toggleDead)} disabled={!sel} title="Bật/tắt tiếng đập “xx” (phím X)">xx</Chip>
@@ -733,7 +807,7 @@ export function TabEditor({
         <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
           <p>
             <b>⚠ Có ô chưa đúng số phách.</b> Khi phát, mỗi ô luôn chiếm đủ số phách của nhịp: ô <b>thiếu</b> sẽ có khoảng lặng ở cuối ô,
-            ô <b>thừa</b> làm nốt bị dồn. Đổi trường độ cho khớp, hoặc bù bằng dấu lặng:
+            ô <b>thừa</b> thì nốt cuối vang chồng lên đầu ô sau (nghe như bị mất nốt). Đổi trường độ cho khớp, hoặc:
           </p>
           <ul className="flex flex-col gap-1.5">
             {warnings.map((w) => (
@@ -756,7 +830,11 @@ export function TabEditor({
                     </Chip>
                   </>
                 )}
-                {w.diff > 0 && <span className="text-amber-200/70">→ rút ngắn một nốt hoặc xoá bớt beat</span>}
+                {w.diff > 0 && (
+                  <Chip onClick={() => run(() => commit(() => {}, w.bar))} title="Bớt dấu lặng cuối ô, còn thừa thì đẩy các nốt quá vạch nhịp sang đầu ô sau (như Guitar Pro)">
+                    Dồn sang ô sau
+                  </Chip>
+                )}
               </li>
             ))}
           </ul>
@@ -777,8 +855,12 @@ export function TabEditor({
           <li><b className="text-soft">I</b> / <b className="text-soft">Shift + I</b>: chèn beat trống sau / trước</li>
           <li><b className="text-soft">Shift + ↑ ↓</b>: chuyển nốt sang dây bên cạnh, giữ cao độ</li>
           <li><b className="text-soft">Delete</b>: xoá nốt · <b className="text-soft">Shift + Delete</b>: xoá cả beat</li>
-          <li><b className="text-soft">+ / −</b>: dài hơn / ngắn hơn · <b className="text-soft">.</b>: chấm dôi</li>
+          <li><b className="text-soft">+ / −</b>: dài hơn / ngắn hơn · <b className="text-soft">.</b>: chấm dôi (ô bị thừa phách thì tự bớt dấu lặng cuối ô hoặc dồn nốt sang ô sau)</li>
           <li><b className="text-soft">X</b>: bật/tắt tiếng đập “xx” · <b className="text-soft">S</b>: luyến · <b className="text-soft">L</b>: ngân</li>
+          <li>
+            <b className="text-soft">⌘/Ctrl + C</b>: chép ô · <b className="text-soft">⌘/Ctrl + V</b>: dán đè · <b className="text-soft">Shift + ⌘/Ctrl + V</b>: dán chèn ·
+            chọn nhiều ô: <b className="text-soft">Shift + bấm</b> hoặc <b className="text-soft">Shift + ← →</b>
+          </li>
           <li><b className="text-soft">Space</b>: nghe thử · <b className="text-soft">Ctrl/⌘ + Z</b>: hoàn tác</li>
         </ul>
       </details>
@@ -790,11 +872,12 @@ export function TabEditor({
           onKeyDown={onKeyDown}
           onPointerDownCapture={(e) => {
             const r = e.currentTarget.getBoundingClientRect();
-            pointRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+            pointRef.current = { x: e.clientX - r.left, y: e.clientY - r.top, shift: e.shiftKey };
           }}
           className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           aria-label="Vùng sửa tab — bấm vào nốt rồi dùng bàn phím"
         />
+        <div ref={rangeBoxRef} aria-hidden className="pointer-events-none" style={{ zIndex: 4 }} />
         <div ref={boxRef} aria-hidden className="pointer-events-none absolute hidden rounded-md border-2 border-accent bg-accent/15" style={{ zIndex: 5 }} />
       </div>
       {!ready && !error && <p className="text-sm text-muted">Đang nạp tab…</p>}
@@ -823,6 +906,157 @@ function Chip({ on = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonEle
       className={`inline-flex h-8 items-center justify-center rounded-md border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${look}`}
     />
   );
+}
+
+// ---------- Phách trong ô (960 tick = 1 phách đen) ----------
+
+type AlphaTabLib = typeof import("@coderline/alphatab");
+
+/** Số tick một ô cần theo nhịp (4/4 → 3840) */
+function barCapacity(mb: model.MasterBar) {
+  return (mb.timeSignatureNumerator * 3840) / mb.timeSignatureDenominator;
+}
+
+/** Độ dài một beat, tính thẳng từ trường độ — beat vừa sửa chưa được alphaTab tính lại (giống Beat.updateDurations) */
+function beatTicks(b: Beat) {
+  if (b.graceType) return 0; // nốt hoa mỹ mượn thời gian của nốt bên cạnh
+  if (b.isRest && b.duration === 1 && b.voice?.beats.length === 1) return barCapacity(b.voice.bar.masterBar);
+  let t = 3840 / b.duration;
+  if (b.dots === 2) t += Math.floor(t / 4) * 3;
+  else if (b.dots === 1) t += Math.floor(t / 2);
+  if (b.tupletDenominator > 0 && b.tupletNumerator > 0) t = Math.floor((t * b.tupletDenominator) / b.tupletNumerator);
+  return t;
+}
+
+function voiceTicks(v: model.Voice) {
+  return v.beats.reduce((s, b) => s + beatTicks(b), 0);
+}
+
+/** Các dấu lặng (dài → ngắn) lấp vừa `ticks`; phần lẻ ngắn hơn móc ba bỏ qua */
+function restsFor(lib: AlphaTabLib, voice: model.Voice, ticks: number) {
+  const out: Beat[] = [];
+  for (const d of DURATIONS) {
+    const t = 3840 / d;
+    while (ticks >= t) {
+      const r = new lib.model.Beat();
+      r.duration = d;
+      r.isEmpty = false;
+      r.voice = voice;
+      out.push(r);
+      ticks -= t;
+    }
+  }
+  return out;
+}
+
+/**
+ * Đánh lại mã số ô / voice / beat / nốt cho cả bản nhạc trước khi xuất file.
+ * Mỗi lần đọc file alphaTab đếm lại mã từ 0 → beat lấy từ bản chép (đọc riêng) trùng mã với beat trong bài,
+ * mà file Guitar Pro tham chiếu beat / nốt theo mã → trùng mã là nốt bị lẫn sang chỗ khác.
+ */
+function renumber(score: model.Score) {
+  let bar = 0, voice = 0, beat = 0, note = 0;
+  for (const tr of score.tracks)
+    for (const s of tr.staves)
+      for (const b of s.bars) {
+        b.id = bar++;
+        for (const v of b.voices) {
+          v.id = voice++;
+          for (const bt of v.beats) {
+            bt.id = beat++;
+            for (const n of bt.notes) n.id = note++;
+          }
+        }
+      }
+}
+
+/** Đánh lại chỉ số / liên kết ô sau khi thêm hoặc xoá ô (để xuất file đúng thứ tự) */
+function relinkBars(score: model.Score) {
+  score.masterBars.forEach((m, i) => {
+    m.index = i;
+    m.score = score;
+    m.previousMasterBar = score.masterBars[i - 1] ?? null;
+    m.nextMasterBar = score.masterBars[i + 1] ?? null;
+  });
+  for (const tr of score.tracks)
+    for (const s of tr.staves)
+      s.bars.forEach((b, i) => {
+        b.index = i;
+        b.previousBar = s.bars[i - 1] ?? null;
+        b.nextBar = s.bars[i + 1] ?? null;
+      });
+}
+
+/** Chèn một ô trống ở vị trí `at` (cùng nhịp với `ref`, kẻ sẵn dấu lặng móc đơn) cho mọi track */
+function addBar(lib: AlphaTabLib, score: model.Score, at: number, ref: model.MasterBar) {
+  const mb = new lib.model.MasterBar();
+  mb.timeSignatureNumerator = ref.timeSignatureNumerator;
+  mb.timeSignatureDenominator = ref.timeSignatureDenominator;
+  score.masterBars.splice(at, 0, mb);
+  const grid = Math.max(8, ref.timeSignatureDenominator);
+  const count = Math.max(1, Math.round((ref.timeSignatureNumerator * grid) / ref.timeSignatureDenominator));
+  for (const tr of score.tracks)
+    for (const s of tr.staves) {
+      const bar = new lib.model.Bar();
+      bar.staff = s;
+      const v = new lib.model.Voice();
+      bar.addVoice(v);
+      for (let i = 0; i < count; i++) {
+        const b = new lib.model.Beat();
+        b.duration = grid;
+        v.addBeat(b);
+      }
+      s.bars.splice(at, 0, bar);
+    }
+  relinkBars(score);
+}
+
+/**
+ * Dồn phách như Guitar Pro, bắt đầu từ ô `from`: ô bị thừa phách thì
+ *   1. bớt dấu lặng ở cuối ô (nốt vừa kéo dài "ăn" vào khoảng lặng phía sau),
+ *   2. còn thừa thì đẩy các nốt nằm quá vạch nhịp sang đầu ô sau (ô cuối → thêm ô mới),
+ * rồi xét tiếp ô sau. Không bao giờ để nốt tràn ô — khi phát, nốt tràn sẽ vang chồng lên đầu ô sau.
+ * Trả về lời báo cho người dùng, hoặc null nếu không phải dồn gì.
+ */
+function reflow(lib: AlphaTabLib, score: model.Score, st: model.Staff, from: number, keep: Set<Beat>): string | null {
+  let ate = 0, added = 0;
+  const pushed: number[] = [];
+  for (let i = Math.max(0, from); i < st.bars.length; i++) {
+    const voice = st.bars[i].voices[0];
+    const cap = barCapacity(st.bars[i].masterBar);
+    let over = voiceTicks(voice) - cap;
+    if (over <= 0) break;
+    // 1. dấu lặng cuối ô
+    while (over > 0 && voice.beats.length > 1) {
+      const last = voice.beats[voice.beats.length - 1];
+      if (!last.isRest || keep.has(last)) break;
+      const t = beatTicks(last);
+      voice.beats.pop();
+      ate++;
+      if (t > over) {
+        voice.beats.push(...restsFor(lib, voice, t - over));
+        over = 0;
+      } else over -= t;
+    }
+    if (over <= 0) break;
+    // 2. các beat bắt đầu từ vạch nhịp trở đi → đầu ô sau
+    let t = 0, cut = voice.beats.length;
+    for (let k = 0; k < voice.beats.length; k++) {
+      if (t >= cap) { cut = k; break; }
+      t += beatTicks(voice.beats[k]);
+    }
+    const spill = voice.beats.splice(cut);
+    if (!spill.length) break; // nốt cuối vắt qua vạch nhịp → để nguyên, cảnh báo sẽ hiện
+    if (i === st.bars.length - 1) { addBar(lib, score, i + 1, st.bars[i].masterBar); added++; }
+    const next = st.bars[i + 1].voices[0];
+    for (const b of spill) b.voice = next;
+    next.beats.unshift(...spill);
+    pushed.push(i);
+  }
+  if (!ate && !pushed.length) return null;
+  if (!pushed.length) return "Ô vừa sửa thừa phách → đã bớt dấu lặng ở cuối ô cho vừa đủ.";
+  const first = pushed[0] + 1;
+  return `Ô ${first} thừa phách → đã dồn nốt cuối ô sang đầu ô ${first + 1}${added ? " (thêm ô mới)" : ""}, như Guitar Pro.`;
 }
 
 /** 960 tick = 1 phách (nốt đen) → "1¼ phách"; lẻ hơn móc kép thì đếm móc ba */
