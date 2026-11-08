@@ -80,7 +80,6 @@ function RegisterForm({ next }: { next: string }) {
       <button type="submit" disabled={pending} className={buttonPrimary}>
         {pending ? "Đang tạo tài khoản…" : "Tạo tài khoản"}
       </button>
-      <p className="text-xs text-muted">Không cần email. Nhớ kỹ mật khẩu nhé — hiện chưa có chức năng lấy lại mật khẩu.</p>
     </form>
   );
 }
