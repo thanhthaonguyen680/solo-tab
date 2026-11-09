@@ -2,6 +2,7 @@ import "server-only";
 import { updateTag, revalidatePath } from "next/cache";
 import { isAdmin } from "./admin-auth";
 import { sql } from "./db";
+import { LANGS, paths } from "@/i18n";
 import { getMember } from "./member-auth";
 import { SONGS_TAG } from "./songs";
 
@@ -33,5 +34,5 @@ export async function canPreviewSong(slug: string): Promise<boolean> {
  */
 export function refreshPublicPages(...slugs: (string | null)[]) {
   updateTag(SONGS_TAG);
-  for (const slug of new Set(slugs)) if (slug) revalidatePath(`/bai/${slug}`);
+  for (const slug of new Set(slugs)) if (slug) for (const lang of LANGS) revalidatePath(paths.song(lang, slug));
 }

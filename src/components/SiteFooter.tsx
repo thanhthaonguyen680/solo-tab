@@ -1,14 +1,16 @@
 import { site } from "@/config/site";
+import { dict, type Lang } from "@/i18n";
 
-export function SiteFooter() {
+export function SiteFooter({ lang = "vi" }: { lang?: Lang }) {
+  const t = dict[lang];
   return (
     <footer className="border-t border-line bg-surface text-sm text-muted">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-8">
         <span>
-          <span className="font-display font-semibold text-text">{site.name}</span> · {site.tagline}
+          <span className="font-display font-semibold text-text">{site.name}</span> · {t.tagline}
         </span>
         <a href={site.contact.href} className="font-semibold text-soft transition-colors hover:text-accent-ink">
-          {site.contact.label} →
+          {t.footer.contact} →
         </a>
       </div>
       <div className="border-t border-line">

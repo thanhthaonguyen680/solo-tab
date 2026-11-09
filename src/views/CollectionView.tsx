@@ -3,22 +3,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SongBrowser } from "@/components/SongBrowser";
 import { collections, isCollectionSlug, site } from "@/config/site";
+import { alternates, dict, paths, type Lang } from "@/i18n";
 import { getSongs } from "@/lib/songs";
 
-export function generateStaticParams() {
+export function collectionParams() {
   return Object.keys(collections).map((collection) => ({ collection }));
 }
 
-export async function generateMetadata(props: PageProps<"/[collection]">): Promise<Metadata> {
-  const { collection } = await props.params;
+export function collectionMetadata(lang: Lang, collection: string): Metadata {
   if (!isCollectionSlug(collection)) return {};
-  return { title: collections[collection].title, description: collections[collection].blurb };
+  return {
+    title: collections[collection].title,
+    description: dict[lang].collections[collection],
+    alternates: alternates(lang, paths.collection("vi", collection), paths.collection("en", collection)),
+  };
 }
 
-export default async function CollectionPage(props: PageProps<"/[collection]">) {
-  const { collection } = await props.params;
+export async function CollectionView({ lang, collection }: { lang: Lang; collection: string }) {
   if (!isCollectionSlug(collection)) notFound();
-
+  const t = dict[lang];
   const info = collections[collection];
   const songs = await getSongs(collection);
 
@@ -26,24 +29,24 @@ export default async function CollectionPage(props: PageProps<"/[collection]">) 
     <>
       <section className="strings">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-12">
-          <Link href="/" className="w-fit text-sm text-muted hover:text-text">
-            ← Trang chủ
+          <Link href={paths.home(lang)} className="w-fit text-sm text-muted hover:text-text">
+            {t.collection.back}
           </Link>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="eyebrow">{site.name}</p>
               <h1 className="mt-2 text-4xl sm:text-5xl">{info.title}</h1>
-              <p className="mt-2 text-lg text-muted">{info.blurb}</p>
+              <p className="mt-2 text-lg text-muted">{t.collections[collection]}</p>
             </div>
             <a href={site.contact.href} className="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline">
-              Chưa có bài bạn cần? Yêu cầu bài →
+              {t.collection.request}
             </a>
           </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-5xl px-4 pb-16">
-        <SongBrowser songs={songs} />
+        <SongBrowser songs={songs} lang={lang} />
       </div>
     </>
   );

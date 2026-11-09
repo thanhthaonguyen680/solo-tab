@@ -1,3 +1,5 @@
+import { dict, type Lang } from "@/i18n";
+
 const pill = "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold";
 
 export function AudioBadge() {
@@ -11,12 +13,12 @@ export function AudioBadge() {
   );
 }
 
-export function NewBadge() {
-  return <span className={`${pill} border-accent/40 bg-fresh text-accent-ink`}>Mới</span>;
+export function NewBadge({ lang = "vi" }: { lang?: Lang }) {
+  return <span className={`${pill} border-accent/40 bg-fresh text-accent-ink`}>{dict[lang].badge.new}</span>;
 }
 
-export function FreeBadge() {
-  return <span className={`${pill} border-accent bg-accent text-accent-fg`}>Miễn phí</span>;
+export function FreeBadge({ lang = "vi" }: { lang?: Lang }) {
+  return <span className={`${pill} border-accent bg-accent text-accent-fg`}>{dict[lang].badge.free}</span>;
 }
 
 export function Tag({ children }: { children: React.ReactNode }) {

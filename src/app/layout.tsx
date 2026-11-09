@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Chakra_Petch, JetBrains_Mono, Zalando_Sans } from "next/font/google";
-import { SiteFooter } from "@/components/SiteFooter";
-import { SiteHeader } from "@/components/SiteHeader";
 import { site } from "@/config/site";
 import "./globals.css";
 
@@ -39,9 +37,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="vi" className={`${zalando.variable} ${chakra.variable} ${jetbrains.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+        {/* Header / footer nằm ở layout của từng ngôn ngữ: (vi), en, admin */}
+        {children}
         <Analytics />
       </body>
     </html>

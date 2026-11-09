@@ -1,14 +1,11 @@
-import Link from "next/link";
-import { buttonPrimary } from "@/components/buttons";
+import { SiteShell } from "@/components/SiteShell";
+import { NotFoundView } from "@/views/NotFoundView";
 
+/** Đường dẫn không khớp trang nào (nằm ngoài layout từng ngôn ngữ) → tự kèm header / footer */
 export default function NotFound() {
   return (
-    <section className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
-      <pre className="font-mono text-sm text-muted">{"e|---4---0---4---|\nB|---------------|"}</pre>
-      <h1 className="text-3xl">Lạc nhịp rồi — không tìm thấy trang</h1>
-      <Link href="/" className={buttonPrimary("lg")}>
-        Về trang chủ
-      </Link>
-    </section>
+    <SiteShell lang="vi" switcher={false}>
+      <NotFoundView lang="vi" />
+    </SiteShell>
   );
 }

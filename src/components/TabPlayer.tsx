@@ -2,6 +2,7 @@
 
 import type { AlphaTabApi } from "@coderline/alphatab";
 import { useEffect, useRef, useState } from "react";
+import { dict, type Lang } from "@/i18n";
 import { decodeNotation } from "@/lib/notation-format";
 
 const BPM_STEP = 4;
@@ -18,7 +19,8 @@ type Status =
  * và tự phát bằng soundfont. Con trỏ chạy theo từng nốt, trang tự cuộn theo,
  * chỉnh được tempo / lặp / máy đếm nhịp. `defaultBpm`: ô Tempo trong admin — tempo khi mở bài.
  */
-export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultBpm?: number }) {
+export function TabPlayer({ notation, defaultBpm, lang = "vi" }: { notation: string; defaultBpm?: number; lang?: Lang }) {
+  const t = dict[lang].player;
   const hostRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -36,7 +38,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
     metronome: false,
     countIn: false,
   });
-  const [status, setStatus] = useState<Status>({ kind: "loading", label: "Đang vẽ tab…" });
+  const [status, setStatus] = useState<Status>({ kind: "loading", label: t.drawing });
   const [playerReady, setPlayerReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState({ current: 0, end: 0 });
@@ -68,7 +70,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
       setHorizontal(isHorizontal);
       setPlayerReady(false);
       setPlaying(false);
-      setStatus({ kind: "loading", label: "Đang vẽ tab…" });
+      setStatus({ kind: "loading", label: t.drawing });
       const scroller = scrollRef.current;
       const css = getComputedStyle(document.documentElement);
       const color = (name: string) => css.getPropertyValue(name).trim();
@@ -120,10 +122,10 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           api.countInVolume = prefsRef.current.countIn ? 1 : 0;
         }
       });
-      api.renderFinished.on(() => setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: "Đang tải tiếng đàn…" } : s)));
+      api.renderFinished.on(() => setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: t.loadingSound } : s)));
       api.soundFontLoad.on((e) => {
         const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
-        setStatus({ kind: "loading", label: `Đang tải tiếng đàn… ${pct}%` });
+        setStatus({ kind: "loading", label: `${t.loadingSound} ${pct}%` });
       });
       api.playerReady.on(() => {
         setPlayerReady(true);
@@ -137,7 +139,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
       api.playerPositionChanged.on((e) => setTime({ current: e.currentTime, end: e.endTime }));
       api.error.on((e) => {
         console.error("alphaTab:", e);
-        setStatus({ kind: "error", message: "Không tải được tab tương tác." });
+        setStatus({ kind: "error", message: t.error });
       });
 
       const data = decodeNotation(notation);
@@ -145,7 +147,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
       else api.tex(data.tex);
     })().catch((e) => {
       console.error("alphaTab:", e);
-      setStatus({ kind: "error", message: "Không tải được tab tương tác." });
+      setStatus({ kind: "error", message: t.error });
     });
 
     return () => {
@@ -159,7 +161,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
         silentAudioRef.current = null;
       }
     };
-  }, [notation, defaultBpm, layoutChoice]);
+  }, [notation, defaultBpm, layoutChoice, t]);
 
   function togglePlay() {
     const api = apiRef.current;
@@ -206,7 +208,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
   }
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Tab tương tác">
+    <section className="flex flex-col gap-3" aria-label={t.region}>
       <div
         ref={controlsRef}
         className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 backdrop-blur-md"
@@ -215,7 +217,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           type="button"
           onClick={togglePlay}
           disabled={!playerReady}
-          aria-label={playing ? "Tạm dừng" : "Phát"}
+          aria-label={playing ? t.pause : t.play}
           className="glow grid size-10 place-items-center rounded-lg sm:size-11 bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-50 disabled:shadow-none"
         >
           {playing ? (
@@ -232,7 +234,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
           type="button"
           onClick={() => apiRef.current?.stop()}
           disabled={!playerReady}
-          aria-label="Về đầu bài"
+          aria-label={t.stop}
           className="grid size-10 place-items-center rounded-lg sm:size-11 border border-border text-soft transition-colors hover:border-muted hover:text-text disabled:opacity-50"
         >
           <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden>
@@ -250,7 +252,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
               type="button"
               onClick={() => bpm && changeBpm(bpm - BPM_STEP)}
               disabled={!bpm || bpm <= BPM_MIN}
-              aria-label="Giảm tempo"
+              aria-label={t.slower}
               className="w-8 text-lg leading-none text-soft sm:w-9 transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
             >
               −
@@ -259,7 +261,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
               type="button"
               onClick={() => startBpm && changeBpm(startBpm)}
               disabled={!bpm}
-              title={startBpm ? `Bấm để về tempo mặc định (${startBpm} bpm)` : undefined}
+              title={startBpm ? t.resetTempo(startBpm) : undefined}
               className={`min-w-[64px] border-x border-border px-1.5 font-mono sm:min-w-[76px] sm:px-2 text-xs tabular-nums transition-colors hover:bg-surface-2 ${
                 bpm && startBpm && bpm !== startBpm ? "text-accent-ink" : "text-soft"
               }`}
@@ -270,7 +272,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
               type="button"
               onClick={() => bpm && changeBpm(bpm + BPM_STEP)}
               disabled={!bpm || bpm >= BPM_MAX}
-              aria-label="Tăng tempo"
+              aria-label={t.faster}
               className="w-8 text-lg leading-none text-soft sm:w-9 transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
             >
               +
@@ -280,16 +282,16 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
         {/* Điện thoại: các nút bật/tắt nằm một hàng, kéo ngang được nếu chật */}
         <div className="flex w-full gap-2 overflow-x-auto sm:w-auto">
           <Toggle on={loop} onClick={() => toggleLoop(!loop)}>
-            Lặp lại
+            {t.loop}
           </Toggle>
           <Toggle on={metronome} onClick={() => toggleMetronome(!metronome)}>
-            Đếm nhịp
+            {t.metronome}
           </Toggle>
           <Toggle on={countIn} onClick={() => toggleCountIn(!countIn)}>
-            Đếm vào
+            {t.countIn}
           </Toggle>
           <Toggle on={horizontal} onClick={() => setLayoutChoice(horizontal ? "page" : "horizontal")}>
-            Cuộn ngang
+            {t.horizontal}
           </Toggle>
         </div>
       </div>
@@ -311,7 +313,7 @@ export function TabPlayer({ notation, defaultBpm }: { notation: string; defaultB
       >
         <div ref={hostRef} />
       </div>
-      <p className="text-xs text-muted">Bấm vào một nốt bất kỳ để phát từ chỗ đó.</p>
+      <p className="text-xs text-muted">{t.hint}</p>
     </section>
   );
 }

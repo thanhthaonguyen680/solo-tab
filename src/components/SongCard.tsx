@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { site } from "@/config/site";
+import { dict, paths, type Lang } from "@/i18n";
 import type { SongSummary } from "@/lib/songs";
 import { AudioBadge, FreeBadge, NewBadge, Tag } from "./Badges";
 
 const levelBars = { "Dễ": 1, "Vừa": 2, "Khó": 3 } as const;
 
-export function SongCard({ song }: { song: SongSummary }) {
+export function SongCard({ song, lang = "vi" }: { song: SongSummary; lang?: Lang }) {
+  const level = `${dict[lang].song.level}: ${dict[lang].level[song.level]}`;
   return (
     <Link
-      href={`/bai/${song.slug}`}
+      href={paths.song(lang, song.slug)}
       className="group flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 transition-colors hover:border-accent/50 hover:bg-surface-2"
     >
       <div className="flex items-start justify-between gap-3">
@@ -17,8 +19,8 @@ export function SongCard({ song }: { song: SongSummary }) {
           {song.artist && <p className="truncate text-sm text-muted">{song.artist}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          {site.membership && song.free && <FreeBadge />}
-          {song.isNew && <NewBadge />}
+          {site.membership && song.free && <FreeBadge lang={lang} />}
+          {song.isNew && <NewBadge lang={lang} />}
           {song.hasAudio && <AudioBadge />}
         </div>
       </div>
@@ -31,7 +33,7 @@ export function SongCard({ song }: { song: SongSummary }) {
         </div>
         <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-muted">
           {song.key && <span>{song.key}</span>}
-          <span className="flex items-end gap-0.5" title={`Độ khó: ${song.level}`} aria-label={`Độ khó: ${song.level}`}>
+          <span className="flex items-end gap-0.5" title={level} aria-label={level}>
             {[1, 2, 3].map((n) => (
               <span
                 key={n}
