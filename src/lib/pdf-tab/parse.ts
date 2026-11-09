@@ -124,6 +124,19 @@ function smuflGlyph(g: MusicGlyph, kind: Kind): Glyph {
   return { x0: g.x, x1: g.x + g.w, y0: g.y - half, y1: g.y + half, n: 0, op: 0, kind };
 }
 
+/**
+ * Dấu lặng đen / móc đơn / móc kép của Guitar Pro 7 (vẽ thành hình) → trường độ.
+ * Đo trên PDF Guitar Pro 7: lặng đen và móc kép cùng 96 điểm, khác bề rộng.
+ */
+function gp7Rest(f: Fill): number | null {
+  if (f.op !== 22) return null;
+  const w = f.x1 - f.x0;
+  const h = f.y1 - f.y0;
+  if (f.n === 96 && near(h, 12, 0.6)) return w < 4.7 ? 4 : 16;
+  if (f.n === 54 && near(w, 4.3, 0.4) && near(h, 8, 0.5)) return 8;
+  return null;
+}
+
 function classify(f: Fill, smufl: boolean): Kind {
   const w = f.x1 - f.x0;
   const h = f.y1 - f.y0;
@@ -139,7 +152,8 @@ function classify(f: Fill, smufl: boolean): Kind {
   if (w >= 8.6 && w <= 11 && h >= 4.4 && h <= 6.6 && f.op === 22 && f.n < 60) return "head-whole";
   if (w >= 1.5 && w <= 2.5 && h >= 1.5 && h <= 2.5 && f.n === 13) return "dot";
   if (w >= 3.8 && w <= 5.2 && h >= 8.5 && h <= 11 && f.n === 42) return "flag1";
-  if (w >= 3.8 && w <= 5.6 && h >= 11 && h <= 17 && f.n > 50) return "flag2";
+  // (hình 96 điểm cùng cỡ là dấu lặng đen / móc kép — đứng riêng, không gắn đuôi nốt)
+  if (w >= 3.8 && w <= 5.6 && h >= 11 && h <= 17 && f.n > 50 && f.n !== 96) return "flag2";
   if (f.op === 23 && w >= 3.5 && w <= 5 && h >= 1.8 && h <= 2.8) return "rest-block";
   return "other";
 }
@@ -177,7 +191,14 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
         glyphs.push({ x0: x - 0.3, x1: x + 0.3, y0: Math.min(sg.y0, sg.y1), y1: Math.max(sg.y0, sg.y1), n: 0, op: 0, kind: "stem" });
       }
     }
+    // Dấu lặng mọi trường độ (trừ lặng tròn / trắng của Guitar Pro 7 — xem "rest-block")
     const smuflRests: (Glyph & { dur: number })[] = [];
+    if (!smufl) {
+      for (const f of glyphs) {
+        const dur = f.kind === "other" ? gp7Rest(f) : null;
+        if (dur) smuflRests.push({ ...f, dur });
+      }
+    }
     // Cỡ đầu nốt thường của trang — đầu nốt nhỏ hơn hẳn là nốt hoa mỹ
     const headSize = median(g.glyphs.filter((m) => SMUFL_KIND[m.code]?.startsWith("head")).map((m) => m.size));
     for (const m of g.glyphs) {
@@ -328,7 +349,7 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
           const whole = r.y0 < std!.lines[1] + 0.5 && r.y1 <= std!.lines[2] + 0.6;
           cols.push({ x: (r.x0 + r.x1) / 2, rest: true, dur: whole ? 1 : 2, dots: 0, notes: [] });
         }
-        // Dấu lặng SMuFL (Guitar Pro 8) — đủ mọi trường độ, kèm chấm dôi nếu có
+        // Dấu lặng đen, móc đơn, móc kép… (Guitar Pro 8: ký tự SMuFL; 7: hình) — kèm chấm dôi nếu có
         for (const r of smuflRests.filter((r) => inBar((r.x0 + r.x1) / 2) && r.y0 >= zoneTop && r.y1 <= zoneBot)) {
           const dotted = dots.some((d) => d.x0 > r.x1 - 0.5 && d.x0 < r.x1 + 7 && near(d.y0, r.y0, 8));
           cols.push({ x: (r.x0 + r.x1) / 2, rest: true, dur: r.dur, dots: dotted ? 1 : 0, notes: [] });
