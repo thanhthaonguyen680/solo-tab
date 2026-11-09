@@ -42,3 +42,12 @@ export function isValidFileNotation(notation: string) {
   const m = notation.match(/^@score:(\d{1,2});([A-Za-z0-9+/]+=*)$/);
   return Boolean(m) && notation.length <= FILE_PREFIX.length + 4 + Math.ceil((SCORE_FILE_MAX_BYTES * 4) / 3) + 4;
 }
+
+/**
+ * Đặt tên bài / ca sĩ ở đầu bản nhạc theo thông tin trong admin (file nốt có thể còn tên cũ).
+ * Gọi trong sự kiện scoreLoaded của alphaTab — sự kiện này chạy trước khi vẽ.
+ */
+export function applySongInfo(score: { title: string; artist: string }, title?: string, artist?: string) {
+  if (title?.trim()) score.title = title.trim();
+  if (artist?.trim()) score.artist = artist.trim();
+}

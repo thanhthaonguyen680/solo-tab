@@ -3,7 +3,7 @@
 import type { AlphaTabApi } from "@coderline/alphatab";
 import { useEffect, useRef, useState } from "react";
 import { dict, type Lang } from "@/i18n";
-import { decodeNotation } from "@/lib/notation-format";
+import { applySongInfo, decodeNotation } from "@/lib/notation-format";
 
 const BPM_STEP = 4;
 const BPM_MIN = 30;
@@ -19,7 +19,20 @@ type Status =
  * và tự phát bằng soundfont. Con trỏ chạy theo từng nốt, trang tự cuộn theo,
  * chỉnh được tempo / lặp / máy đếm nhịp. `defaultBpm`: ô Tempo trong admin — tempo khi mở bài.
  */
-export function TabPlayer({ notation, defaultBpm, lang = "vi" }: { notation: string; defaultBpm?: number; lang?: Lang }) {
+export function TabPlayer({
+  notation,
+  defaultBpm,
+  title,
+  artist,
+  lang = "vi",
+}: {
+  notation: string;
+  defaultBpm?: number;
+  /** Tên bài / ca sĩ trong admin — hiện ở đầu bản nhạc thay cho tên ghi sẵn trong file nốt */
+  title?: string;
+  artist?: string;
+  lang?: Lang;
+}) {
   const t = dict[lang].player;
   const hostRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -110,6 +123,7 @@ export function TabPlayer({ notation, defaultBpm, lang = "vi" }: { notation: str
       apiRef.current = api;
 
       api.scoreLoaded.on((score) => {
+        applySongInfo(score, title, artist); // chạy trước khi alphaTab vẽ
         const start = defaultBpm ?? score.tempo;
         const current = prefsRef.current.bpm ?? start;
         setBaseBpm(score.tempo);
@@ -161,7 +175,7 @@ export function TabPlayer({ notation, defaultBpm, lang = "vi" }: { notation: str
         silentAudioRef.current = null;
       }
     };
-  }, [notation, defaultBpm, layoutChoice, t]);
+  }, [notation, defaultBpm, layoutChoice, t, title, artist]);
 
   function togglePlay() {
     const api = apiRef.current;

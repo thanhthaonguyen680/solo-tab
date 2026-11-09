@@ -94,6 +94,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
         key={song.notation?.length ?? 0}
         slug={song.slug}
         title={song.title}
+        artist={song.artist}
         notation={song.notation ?? null}
         defaultBpm={song.bpm}
       />

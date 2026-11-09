@@ -3,7 +3,7 @@
 import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { decodeNotation, encodeScoreFile } from "@/lib/notation-format";
+import { applySongInfo, decodeNotation, encodeScoreFile } from "@/lib/notation-format";
 import { saveScore } from "@/lib/song-content-actions";
 import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
 
@@ -25,12 +25,17 @@ const BPM_STEP = 4, BPM_MIN = 30, BPM_MAX = 240;
  */
 export function TabEditor({
   slug,
+  title,
+  artist,
   notation,
   defaultBpm,
   isNew = false,
   onClose,
 }: {
   slug: string;
+  /** Tên bài / ca sĩ trong admin — ghi đè tên trong file nốt, lưu tab là lưu luôn tên mới */
+  title?: string;
+  artist?: string;
   notation: string;
   defaultBpm?: number;
   /** Tab trống vừa tạo (chưa lưu) */
@@ -243,6 +248,8 @@ export function TabEditor({
         trackRef.current = 0;
         api.tex(data.tex);
       }
+      // tên bài theo admin — đăng ký đầu tiên để mốc hoàn tác và file lưu đều mang tên mới
+      api.scoreLoaded.on((score) => applySongInfo(score, title, artist));
       // tempo nghe thử: áp lại sau mỗi lần nạp (mỗi lần sửa là một lần nạp lại)
       api.scoreLoaded.on((score) => {
         const t = bpmRef.current;
@@ -261,7 +268,7 @@ export function TabEditor({
       });
     })().catch((e) => { console.error("alphaTab:", e); setError("Không nạp được tab để sửa."); });
     return () => { cancelled = true; api?.destroy(); apiRef.current = null; };
-  }, [notation, defaultBpm, checkBars, drawSelection, setCursor]);
+  }, [notation, defaultBpm, checkBars, drawSelection, setCursor, title, artist]);
 
   const changeBpm = (next: number) => {
     const v = Math.min(BPM_MAX, Math.max(BPM_MIN, next));

@@ -17,11 +17,13 @@ type Mode = { kind: "idle" } | { kind: "form" } | { kind: "edit"; notation: stri
 export function TabEditorLauncher({
   slug,
   title,
+  artist,
   notation,
   defaultBpm,
 }: {
   slug: string;
   title: string;
+  artist?: string;
   notation: string | null;
   defaultBpm?: number;
 }) {
@@ -33,6 +35,8 @@ export function TabEditorLauncher({
     return (
       <TabEditor
         slug={slug}
+        title={title}
+        artist={artist}
         notation={mode.notation}
         isNew={mode.isNew}
         defaultBpm={mode.isNew ? undefined : defaultBpm}
