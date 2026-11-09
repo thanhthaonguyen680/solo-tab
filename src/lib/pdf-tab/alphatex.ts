@@ -46,6 +46,7 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
     for (const b of bar.beats) {
       const fx: string[] = [];
       if (b.dots) fx.push("d");
+      if (b.grace) fx.push("gr"); // nốt hoa mỹ: không chiếm phách, ăn bớt thời gian của nốt trước
       if (b.chord) fx.push(`ch "${esc(b.chord)}"`);
       if (b.arpeggio) fx.push("au");
       let body = "r";
