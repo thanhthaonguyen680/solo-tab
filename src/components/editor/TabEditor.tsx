@@ -210,13 +210,17 @@ export function TabEditor({
       const pickRange = () => {
         rangeRef.current = pointRef.current?.shift ? { anchor: rangeRef.current?.anchor ?? cursorRef.current.bar } : null;
       };
+      // Trình sửa chỉ sửa bè 1 (giai điệu). Bản có nhiều bè (vd. bè bass riêng): bấm vào bè khác thì bỏ qua,
+      // không thì vị trí beat của bè đó bị hiểu nhầm thành beat của bè 1.
       api.noteMouseDown.on((note) => {
-        pickRange();
         const beat = note.beat;
+        if (beat.voice.index !== 0) return;
+        pickRange();
         setCursor({ bar: beat.voice.bar.index, beat: beat.index, string: stringCount() - note.string + 1 });
         host.focus();
       });
       api.beatMouseDown.on((beat) => {
+        if (beat.voice.index !== 0) return;
         pickRange();
         // bấm vào chỗ trống trên khuông tab → chọn đúng dây đó (để thêm nốt đôi / hợp âm)
         let string = cursorRef.current.string;
