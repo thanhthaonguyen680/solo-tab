@@ -13,7 +13,8 @@ export const SONG_COLUMNS = `
   slug, title, artist, collection, tags, level, key, bpm,
   audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation,
   status, author_id::int as "authorId", review_note as "reviewNote",
-  (select u.username from users u where u.id = author_id) as "authorName"`;
+  coalesce((select u.username from users u where u.id = author_id), contributor_name) as "authorName",
+  submitted_at is not null as "contributed"`;
 
 export type SongRow = {
   slug: string;
@@ -34,6 +35,7 @@ export type SongRow = {
   authorId: number | null;
   reviewNote: string | null;
   authorName: string | null;
+  contributed: boolean;
 };
 
 export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
@@ -55,6 +57,7 @@ export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
     status: r.status,
     authorId: r.authorId ?? undefined,
     authorName: r.authorName ?? undefined,
+    contributed: r.contributed,
     reviewNote: r.reviewNote ?? undefined,
   };
 }

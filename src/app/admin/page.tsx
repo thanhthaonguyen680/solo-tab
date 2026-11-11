@@ -53,7 +53,7 @@ export default async function AdminHome(props: PageProps<"/admin">) {
             {pending.map((s) => (
               <li key={s.slug} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span>
-                  <b>{s.title}</b> <span className="text-sm text-muted">— gửi bởi {s.authorName ?? "thành viên"}</span>
+                  <b>{s.title}</b> <span className="text-sm text-muted">— gửi bởi {s.authorName ?? "khách (không ghi tên)"}</span>
                 </span>
                 <Link href={`/admin/bai/${s.slug}`} className="text-sm font-bold underline underline-offset-4 hover:text-accent-ink">
                   Xem & duyệt →
@@ -104,7 +104,7 @@ export default async function AdminHome(props: PageProps<"/admin">) {
                   <td className="px-4 py-3">
                     <p className="font-bold">{s.title}</p>
                     <p className="text-muted">{s.artist ?? "—"}</p>
-                    {s.authorName && <p className="text-xs text-muted">Thành viên: {s.authorName}</p>}
+                    {s.contributed && <p className="text-xs text-muted">Người gửi: {s.authorName ?? "khách"}</p>}
                   </td>
                   <td className="px-4 py-3">{collections[s.collection].title}</td>
                   <td className="px-4 py-3">{s.level}</td>

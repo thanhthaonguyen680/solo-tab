@@ -1,14 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
 import { TabPlayer } from "@/components/TabPlayer";
-import { collections } from "@/config/site";
 import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS } from "@/lib/notation-format";
 import { readPdfTab, readScoreFile, type ScoreFile } from "@/lib/score-reader";
-import { LEVELS } from "@/lib/song-model";
-import { submitContribution } from "./actions";
+import { ContributionForm } from "./ContributionForm";
 
 type Ready = {
   fileName: string;
@@ -23,11 +20,10 @@ type Ready = {
   oddBars: number[];
 };
 
-type State = { step: "idle" } | { step: "reading"; fileName: string } | ({ step: "ready"; sending: boolean } & Ready);
+type State = { step: "idle" } | { step: "reading"; fileName: string } | ({ step: "ready" } & Ready);
 
 /** Đẩy file PDF / Guitar Pro lên → đọc ngay trên trình duyệt thành phần nhạc phát được → nghe thử → gửi duyệt */
 export function ContributeUploader() {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ step: "idle" });
   const [error, setError] = useState<string>();
@@ -48,7 +44,6 @@ export function ContributeUploader() {
         if (tab.notation === null) throw new Error(tab.reason);
         setState({
           step: "ready",
-          sending: false,
           fileName: file.name,
           title: tab.title ?? file.name.replace(/\.pdf$/i, ""),
           artist: "",
@@ -64,7 +59,6 @@ export function ContributeUploader() {
         const guitar = score.tracks.find((t) => t.notes > 0) ?? score.tracks[0];
         setState({
           step: "ready",
-          sending: false,
           fileName: file.name,
           title: score.title,
           artist: score.artist,
@@ -87,33 +81,11 @@ export function ContributeUploader() {
   const notation =
     state.step === "ready" ? (state.score ? encodeScoreFile(state.score.bytes, state.track) : state.pdfNotation!) : null;
 
-  async function onSubmit(form: FormData) {
-    if (state.step !== "ready" || !notation) return;
-    setError(undefined);
-    setState({ ...state, sending: true });
-    const result = await submitContribution({
-      title: String(form.get("title") ?? ""),
-      artist: String(form.get("artist") ?? ""),
-      collection: String(form.get("collection") ?? ""),
-      level: String(form.get("level") ?? ""),
-      notation,
-      tempo: state.tempo,
-      rights: form.get("rights") === "on",
-    });
-    if (!result.ok) {
-      setState({ ...state, sending: false });
-      return setError(result.error);
-    }
-    setState({ step: "idle" });
-    setNotice(`✓ Đã gửi “${result.title}”. Bài sẽ hiện trên site sau khi admin duyệt.`);
-    router.refresh();
-  }
-
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-accent/40 bg-surface p-5" aria-label="Gửi bài">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Đẩy file lên</h2>
+          <h2 className="text-xl font-semibold">Tải file lên</h2>
           <p className="text-sm text-muted">
             <b className="text-soft">File Guitar Pro</b> (.gp, .gp5, .gpx…) / MusicXML, hoặc <b className="text-soft">PDF xuất từ Guitar Pro</b>.
             Hệ thống tự dựng phần nhạc phát được — nghe thử rồi gửi.
@@ -126,7 +98,7 @@ export function ContributeUploader() {
           className="sr-only"
           id="contribute-file"
           onChange={(e) => onPick(e.target.files?.[0])}
-          disabled={state.step === "reading" || (state.step === "ready" && state.sending)}
+          disabled={state.step === "reading"}
         />
         <label htmlFor="contribute-file" className={`${state.step === "ready" ? buttonSecondary : buttonPrimary} cursor-pointer`}>
           {state.step === "ready" ? "Chọn file khác" : "Chọn file PDF / Guitar Pro"}
@@ -179,59 +151,20 @@ export function ContributeUploader() {
 
           <TabPlayer key={`${state.fileName}:${state.track}`} notation={notation} />
 
-          <form action={onSubmit} className="grid gap-4 rounded-xl border border-line bg-bg p-4 sm:grid-cols-2" aria-label="Thông tin bài">
-            <Field label="Tên bài *" id="c-title" className="sm:col-span-2">
-              <input id="c-title" name="title" required maxLength={200} defaultValue={state.title} className={inputClass} />
-            </Field>
-            <Field label="Ca sĩ / tác giả bài hát" id="c-artist">
-              <input id="c-artist" name="artist" maxLength={200} defaultValue={state.artist} className={inputClass} />
-            </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Kho" id="c-collection">
-                <select id="c-collection" name="collection" defaultValue="melody" className={inputClass}>
-                  {Object.values(collections).map((c) => (
-                    <option key={c.slug} value={c.slug}>
-                      {c.title}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Độ khó" id="c-level">
-                <select id="c-level" name="level" defaultValue="Vừa" className={inputClass}>
-                  {LEVELS.map((l) => (
-                    <option key={l}>{l}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm sm:col-span-2">
-              <input type="checkbox" name="rights" required className="mt-0.5 size-5 shrink-0 accent-[var(--accent-ink)]" />
-              <span>
-                <b>Tôi tự soạn tab này</b> (hoặc được người soạn cho phép đăng). Tab có thể bị gỡ nếu chủ sở hữu bản quyền yêu cầu.
-              </span>
-            </label>
-            <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button type="submit" disabled={state.sending} className={buttonPrimary}>
-                {state.sending ? "Đang gửi…" : "Gửi đóng góp"}
-              </button>
-              <button type="button" onClick={() => setState({ step: "idle" })} disabled={state.sending} className={buttonSecondary}>
-                Huỷ
-              </button>
-            </div>
-          </form>
+          <ContributionForm
+            key={state.fileName}
+            notation={notation}
+            tempo={state.tempo}
+            defaultTitle={state.title}
+            defaultArtist={state.artist}
+            onCancel={() => setState({ step: "idle" })}
+            onSent={(title) => {
+              setState({ step: "idle" });
+              setNotice(`✓ Đã gửi “${title}”. Bài sẽ hiện trên site sau khi admin duyệt.`);
+            }}
+          />
         </>
       )}
-    </section>
-  );
-}
-
-function Field({ label, id, className = "", children }: { label: string; id: string; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={id} className="text-sm font-bold">
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

@@ -35,10 +35,13 @@ export type Song = {
   /** Tab tương tác (alphaTex) — đọc tự động từ sheet PDF Guitar Pro khi admin tải lên */
   notation?: string;
   status?: SongStatus;
-  /** Thành viên đã gửi bài (không có = admin tự thêm) */
+  /** Thành viên (tài khoản cũ) đã gửi bài — bài gửi không cần tài khoản thì không có */
   authorId?: number;
+  /** Tên người soạn tab: tên tài khoản cũ hoặc tên người gửi tự ghi */
   authorName?: string;
-  /** Lời nhắn của admin khi trả bài về cho thành viên sửa */
+  /** Bài do người dùng gửi qua trang Đóng góp (không phải admin tự thêm) */
+  contributed?: boolean;
+  /** Ghi chú của admin khi từ chối bài */
   reviewNote?: string;
 };
 

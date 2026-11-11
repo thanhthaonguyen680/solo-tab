@@ -30,9 +30,12 @@ export function TabEditor({
   notation,
   defaultBpm,
   isNew = false,
+  onSave: saveHandler,
+  saveLabel = "Lưu tab",
   onClose,
 }: {
-  slug: string;
+  /** Bài trong database — bấm "Lưu tab" thì lưu thẳng vào bài này (admin) */
+  slug?: string;
   /** Tên bài / ca sĩ trong admin — ghi đè tên trong file nốt, lưu tab là lưu luôn tên mới */
   title?: string;
   artist?: string;
@@ -40,6 +43,9 @@ export function TabEditor({
   defaultBpm?: number;
   /** Tab trống vừa tạo (chưa lưu) */
   isNew?: boolean;
+  /** Thay cho lưu vào bài `slug`: nhận tab đã soạn (vd. trang đóng góp chuyển sang bước gửi bài) */
+  onSave?: (notation: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  saveLabel?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -57,7 +63,7 @@ export function TabEditor({
   const [dirty, setDirty] = useState(isNew);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | undefined>(
-    isNew ? "Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “Lưu tab”." : undefined,
+    isNew ? `Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “${saveLabel}”.` : undefined,
   );
   const [error, setError] = useState<string>();
   /** Ô lệch phách: diff > 0 là thừa, < 0 là thiếu (đơn vị tick, 960 = 1 phách đen) */
@@ -683,10 +689,16 @@ export function TabEditor({
     setSaving(true);
     setError(undefined);
     const bytes = new lib.exporter.Gp7Exporter().export(api.score, null);
-    const result = await saveScore(slug, encodeScoreFile(bytes, trackRef.current));
+    const encoded = encodeScoreFile(bytes, trackRef.current);
+    const result = saveHandler
+      ? await saveHandler(encoded)
+      : slug
+        ? await saveScore(slug, encoded)
+        : { ok: false as const, error: "Chưa chọn bài để lưu" };
     setSaving(false);
     if (!result.ok) return setError(result.error);
     setDirty(false);
+    if (saveHandler) return;
     setMessage("✓ Đã lưu tab. Trang bài trên site đã cập nhật.");
     router.refresh();
   }
@@ -743,8 +755,8 @@ export function TabEditor({
         <button type="button" onClick={onCancel} className={buttonSecondary}>
           Đóng
         </button>
-        <button type="button" onClick={onSave} disabled={!dirty || saving} className={buttonPrimary}>
-          {saving ? "Đang lưu…" : dirty ? "Lưu tab" : "Đã lưu"}
+        <button type="button" onClick={onSave} disabled={(!dirty && !saveHandler) || saving} className={buttonPrimary}>
+          {saving ? "Đang lưu…" : dirty || saveHandler ? saveLabel : "Đã lưu"}
         </button>
 
         <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2" role="toolbar" aria-label="Công cụ sửa nốt">

@@ -55,12 +55,16 @@ export async function SongView({ lang, slug }: { lang: Lang; slug: string }) {
         </div>
         <h1 className="text-4xl sm:text-5xl">{song.title}</h1>
         {song.artist && <p className="text-lg text-muted">{song.artist}</p>}
-        {song.authorId && song.authorName && (
+        {song.authorName && (
           <p className="text-sm text-muted">
             {t.song.tabBy}{" "}
-            <Link href={paths.author(lang, song.authorId)} className="font-semibold text-accent-ink underline-offset-4 hover:underline">
-              {song.authorName}
-            </Link>
+            {song.authorId ? (
+              <Link href={paths.author(lang, song.authorId)} className="font-semibold text-accent-ink underline-offset-4 hover:underline">
+                {song.authorName}
+              </Link>
+            ) : (
+              <span className="font-semibold text-soft">{song.authorName}</span>
+            )}
           </p>
         )}
         <div className="flex flex-wrap gap-1">

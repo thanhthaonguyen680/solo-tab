@@ -18,7 +18,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/sheet-uploa
     return Response.json({ error: "Nguồn request không hợp lệ" }, { status: 403 });
   }
   const { slug } = await ctx.params;
-  if (!(await canEditSong(slug))) {
+  if (!(await canEditSong())) {
     return Response.json({ error: "Bạn không có quyền sửa bài này, hoặc phiên đăng nhập đã hết" }, { status: 401 });
   }
 

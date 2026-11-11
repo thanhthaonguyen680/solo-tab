@@ -36,19 +36,20 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
         </div>
         <DeleteSongButton title={song.title} action={deleteSong.bind(null, song.slug)} />
       </div>
-      {author && (
+      {(song.contributed || author) && (
         <section className="flex flex-col gap-3 rounded-2xl border border-amber-400/40 bg-amber-400/5 p-5" aria-label="Duyệt bài">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm">
-              Bài thành viên gửi: <b>{author.name}</b> <span className="text-muted">(thành viên từ {author.since})</span>
+              Bài người dùng gửi: <b>{song.authorName ?? "khách (không ghi tên)"}</b>{" "}
+              {author && <span className="text-muted">(tài khoản cũ, từ {author.since})</span>}
             </p>
             <StatusBadge status={status} />
           </div>
-          {sp["da-tra-ve"] === "1" && <p className="text-sm font-semibold text-accent-ink">✓ Đã trả bài về cho thành viên sửa.</p>}
+          {sp["da-tra-ve"] === "1" && <p className="text-sm font-semibold text-accent-ink">✓ Đã từ chối bài (bài không hiện trên site).</p>}
           {status === "pending" || status === "rejected" || status === "draft" ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted">
-                Nghe thử tab bằng nút “Sửa tab” bên dưới (có thể chỉnh luôn), kiểm tra thông tin bài, rồi duyệt hoặc trả về.
+                Nghe thử tab bằng nút “Sửa tab” bên dưới (có thể chỉnh luôn), kiểm tra thông tin bài, rồi duyệt hoặc từ chối.
               </p>
               <div className="flex flex-wrap items-start gap-3">
                 <form action={approveSong.bind(null, song.slug)}>
@@ -62,11 +63,11 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
                     rows={2}
                     maxLength={1000}
                     defaultValue={song.reviewNote}
-                    placeholder="Lời nhắn cho người gửi: cần sửa gì? (vd. ô 3 sai phách, thiếu tempo…)"
+                    placeholder="Ghi chú lý do từ chối (chỉ admin thấy)"
                     className={`${inputClass} h-auto py-2`}
                   />
                   <button type="submit" className={`${buttonSecondary} w-fit`}>
-                    Trả về cho sửa
+                    Từ chối
                   </button>
                 </form>
               </div>

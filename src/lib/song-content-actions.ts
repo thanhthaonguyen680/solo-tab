@@ -5,7 +5,7 @@ import { isValidFileNotation } from "./notation-format";
 import { canEditSong, refreshPublicPages } from "./song-access";
 import { NOTATION_MAX_CHARS, SHEET_VERSION_PATTERN } from "./song-model";
 
-/** Sheet PDF + tab tương tác của một bài — dùng chung cho trang admin và trang đóng góp của thành viên. */
+/** Sheet PDF + tab tương tác của một bài (trang admin). */
 
 export type SheetResult = { ok: true } | { ok: false; error: string };
 
@@ -21,7 +21,7 @@ export async function commitSheet(
   pageCount: number,
   notation: string | null = null,
 ): Promise<SheetResult> {
-  if (!(await canEditSong(slug))) return DENIED;
+  if (!(await canEditSong())) return DENIED;
   if (!SHEET_VERSION_PATTERN.test(version) || !Number.isInteger(pageCount) || pageCount < 1) {
     return { ok: false, error: "Dữ liệu không hợp lệ" };
   }
@@ -53,7 +53,7 @@ export async function commitSheet(
 }
 
 export async function removeSheet(slug: string): Promise<SheetResult> {
-  if (!(await canEditSong(slug))) return DENIED;
+  if (!(await canEditSong())) return DENIED;
   await sql.transaction([
     sql`update songs set sheet_version = null,
           notation = case when notation like '@score:%' then notation else null end,
@@ -67,7 +67,7 @@ export async function removeSheet(slug: string): Promise<SheetResult> {
 
 /** Lưu file Guitar Pro / MusicXML gốc làm tab tương tác (không đụng tới sheet PDF) */
 export async function saveScore(slug: string, notation: string): Promise<SheetResult> {
-  if (!(await canEditSong(slug))) return DENIED;
+  if (!(await canEditSong())) return DENIED;
   if (typeof notation !== "string" || !isValidFileNotation(notation)) {
     return { ok: false, error: "File tab không hợp lệ hoặc quá lớn" };
   }
@@ -79,7 +79,7 @@ export async function saveScore(slug: string, notation: string): Promise<SheetRe
 
 /** Bỏ tab tương tác của bài (giữ sheet PDF nếu có) */
 export async function removeScore(slug: string): Promise<SheetResult> {
-  if (!(await canEditSong(slug))) return DENIED;
+  if (!(await canEditSong())) return DENIED;
   await sql`update songs set notation = null, updated_at = now() where slug = ${slug}`;
   refreshPublicPages(slug);
   return { ok: true };

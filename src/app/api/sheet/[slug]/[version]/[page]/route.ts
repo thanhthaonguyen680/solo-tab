@@ -22,7 +22,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/sheet/[slug
   if (!row) return new Response("Not found", { status: 404 });
 
   if (row.status !== "published") {
-    if (!(await canPreviewSong(slug))) return new Response("Not found", { status: 404 });
+    if (!(await canPreviewSong())) return new Response("Not found", { status: 404 });
   } else if (!canViewSong({ free: row.free }) && !(await isAdmin())) {
     return new Response("Bài này dành cho thành viên", { status: 403 });
   }

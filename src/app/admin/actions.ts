@@ -107,7 +107,7 @@ export async function saveSong(
   redirect(`/admin?da-luu=${encodeURIComponent(s.slug)}`);
 }
 
-// ---------- Duyệt bài thành viên gửi ----------
+// ---------- Duyệt bài người dùng gửi ----------
 
 /** Đăng bài: hiện trên site, ngày thêm = hôm nay (để được gắn nhãn "Mới") */
 export async function approveSong(slug: string) {
@@ -118,7 +118,7 @@ export async function approveSong(slug: string) {
   redirect(`/admin?da-duyet=${encodeURIComponent(slug)}`);
 }
 
-/** Trả bài về cho thành viên sửa, kèm lời nhắn */
+/** Từ chối bài (không đăng), kèm ghi chú cho admin */
 export async function rejectSong(slug: string, form: FormData) {
   await requireAdmin();
   const note = String(form.get("note") ?? "").trim().slice(0, 1000) || null;
@@ -127,10 +127,11 @@ export async function rejectSong(slug: string, form: FormData) {
   redirect(`/admin/bai/${encodeURIComponent(slug)}?da-tra-ve=1`);
 }
 
-/** Gỡ bài thành viên đã đăng về trạng thái chờ duyệt (ẩn khỏi site) */
+/** Gỡ bài người dùng gửi đã đăng về trạng thái chờ duyệt (ẩn khỏi site) */
 export async function unpublishSong(slug: string) {
   await requireAdmin();
-  await sql`update songs set status = 'pending', updated_at = now() where slug = ${slug} and author_id is not null`;
+  await sql`update songs set status = 'pending', updated_at = now()
+            where slug = ${slug} and (submitted_at is not null or author_id is not null)`;
   refreshPublicPages(slug);
   redirect(`/admin/bai/${encodeURIComponent(slug)}`);
 }

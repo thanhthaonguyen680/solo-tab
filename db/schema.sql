@@ -87,3 +87,12 @@ alter table songs add column if not exists review_note text;
 alter table songs add column if not exists submitted_at timestamptz;
 create index if not exists songs_author_idx on songs (author_id);
 create index if not exists songs_status_idx on songs (status);
+
+-- ---------- Đóng góp không cần tài khoản ----------
+
+-- Bảng users / user_sessions ở trên chỉ còn để giữ tên người soạn của các bài gửi trước đây.
+-- Tên người gửi tự ghi (tuỳ chọn) — hiện là "người soạn tab" trên trang bài
+alter table songs add column if not exists contributor_name text;
+-- SHA-256 của IP người gửi (không lưu IP gốc) — để giới hạn số bài chờ duyệt, chống spam
+alter table songs add column if not exists submitter_hash text;
+create index if not exists songs_pending_submitter_idx on songs (submitter_hash) where status = 'pending';
