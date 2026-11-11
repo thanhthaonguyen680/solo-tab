@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { applySongInfo, decodeNotation, encodeScoreFile } from "@/lib/notation-format";
 import { saveScore } from "@/lib/song-content-actions";
 import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
+import type { Lang } from "@/i18n";
+import { editorText, type EditorText } from "./editor-i18n";
 
 type Beat = model.Beat;
 type Note = model.Note;
@@ -14,8 +16,6 @@ type Cursor = { bar: number; beat: number; string: number };
 type Box = { x: number; y: number; w: number; h: number };
 
 const DURATIONS = [1, 2, 4, 8, 16, 32]; // tròn → móc ba
-const DURATION_NAME: Record<number, string> = { 1: "tròn", 2: "trắng", 4: "đen", 8: "móc đơn", 16: "móc kép", 32: "móc ba" };
-const DURATION_SHORT: Record<number, string> = { 1: "Tròn", 2: "Trắng", 4: "Đen", 8: "Đơn", 16: "Kép", 32: "Ba" };
 const HISTORY_LIMIT = 60;
 const BPM_STEP = 4, BPM_MIN = 30, BPM_MAX = 240;
 
@@ -31,7 +31,8 @@ export function TabEditor({
   defaultBpm,
   isNew = false,
   onSave: saveHandler,
-  saveLabel = "Lưu tab",
+  saveLabel,
+  lang = "vi",
   onClose,
 }: {
   /** Bài trong database — bấm "Lưu tab" thì lưu thẳng vào bài này (admin) */
@@ -46,8 +47,12 @@ export function TabEditor({
   /** Thay cho lưu vào bài `slug`: nhận tab đã soạn (vd. trang đóng góp chuyển sang bước gửi bài) */
   onSave?: (notation: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   saveLabel?: string;
+  lang?: Lang;
   onClose: () => void;
 }) {
+  const t = editorText[lang];
+  const DURATION_NAME = t.durationName;
+  saveLabel ??= t.saveTab;
   const router = useRouter();
   const hostRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -63,7 +68,7 @@ export function TabEditor({
   const [dirty, setDirty] = useState(isNew);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | undefined>(
-    isNew ? `Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “${saveLabel}”.` : undefined,
+    isNew ? t.readyNew(saveLabel) : undefined,
   );
   const [error, setError] = useState<string>();
   /** Ô lệch phách: diff > 0 là thừa, < 0 là thiếu (đơn vị tick, 960 = 1 phách đen) */
@@ -146,16 +151,16 @@ export function TabEditor({
       r = { x: v.x - 2, y: line.y + (c.string - 1) * gap - gap / 2, w: Math.max(v.w, 14) + 4, h: gap };
     }
     Object.assign(box.style, { display: "block", left: `${ox + r.x}px`, top: `${oy + r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
-    const dur = `${DURATION_NAME[beat.duration] ?? beat.duration}${beat.dots ? " chấm" : ""}`;
+    const dur = `${t.durationName[beat.duration] ?? beat.duration}${beat.dots ? t.dotted : ""}`;
     const what = note
-      ? note.isDead ? "X (đập/chặn dây)" : `phím ${note.fret}${note.slideOutType ? " · luyến" : ""}${note.isLetRing ? " · ngân" : ""}`
-      : `${beat.isRest ? "dấu lặng" : "dây trống"} → gõ số để thêm nốt`;
+      ? note.isDead ? t.deadNote : `${t.fret(note.fret)}${note.slideOutType ? t.slideTag : ""}${note.isLetRing ? t.letRingTag : ""}`
+      : t.emptySpot(beat.isRest);
     const gap = voiceTicks(beat.voice) - barCapacity(beat.voice.bar.masterBar);
     // trạng thái phách để ngay đầu (dòng này bị cắt bớt khi màn hình hẹp)
-    const barState = gap === 0 ? "" : ` (⚠ ${gap < 0 ? "thiếu" : "thừa"} ${formatBeats(Math.abs(gap))})`;
-    const picked = to > from ? `[Chọn ô ${from + 1}–${to + 1}] ` : "";
-    setInfo(`${picked}Ô ${c.bar + 1}${barState} · beat ${c.beat + 1} · dây ${c.string} · ${what} · ${dur}`);
-  }, []);
+    const barState = gap === 0 ? "" : ` (⚠ ${gap < 0 ? t.short : t.over} ${formatBeats(Math.abs(gap), t)})`;
+    const picked = to > from ? t.picked(from + 1, to + 1) : "";
+    setInfo(`${picked}${t.info(c.bar + 1, barState, c.beat + 1, c.string, what, dur)}`);
+  }, [t]);
 
   const setCursor = useCallback((c: Cursor) => {
     cursorRef.current = c;
@@ -245,7 +250,7 @@ export function TabEditor({
         setCursor({ bar: beat.voice.bar.index, beat: beat.index, string });
         host.focus();
       });
-      api.error.on((e) => { console.error("alphaTab:", e); setError("Không nạp được tab để sửa."); });
+      api.error.on((e) => { console.error("alphaTab:", e); setError(t.loadError); });
       const data = decodeNotation(notation);
       if (data.kind === "file") {
         trackRef.current = data.track;
@@ -272,9 +277,9 @@ export function TabEditor({
         if (historyRef.current.stack.length) return;
         historyRef.current = { stack: [new alphaTab.exporter.Gp7Exporter().export(score, null)], at: 0 };
       });
-    })().catch((e) => { console.error("alphaTab:", e); setError("Không nạp được tab để sửa."); });
+    })().catch((e) => { console.error("alphaTab:", e); setError(t.loadError); });
     return () => { cancelled = true; api?.destroy(); apiRef.current = null; };
-  }, [notation, defaultBpm, checkBars, drawSelection, setCursor, title, artist]);
+  }, [notation, defaultBpm, checkBars, drawSelection, setCursor, title, artist, t]);
 
   const changeBpm = (next: number) => {
     const v = Math.min(BPM_MAX, Math.max(BPM_MIN, next));
@@ -302,7 +307,7 @@ export function TabEditor({
     const keep = new Set(before.flat().filter((b) => !old.has(b)));
     const cur = before[c0.bar]?.[c0.beat];
     if (cur) keep.add(cur);
-    const flow = st ? reflow(lib, score, st, from, keep) : null;
+    const flow = st ? reflow(lib, score, st, from, keep, t) : null;
     const relocate = (c: Cursor): Cursor => {
       const b = before[c.bar]?.[c.beat];
       if (!flow || !b) return c;
@@ -326,7 +331,7 @@ export function TabEditor({
     setDirty(true);
     api.load(bytes, [trackRef.current]);
     return relocate;
-  }, []);
+  }, [t]);
 
   const travel = useCallback((dir: -1 | 1) => {
     const api = apiRef.current, h = historyRef.current;
@@ -372,7 +377,7 @@ export function TabEditor({
     const { lib, c, beat, voice } = x;
     const at = c.beat + (after ? 1 : 0);
     // ghi chú trước: nếu ô bị thừa phách và được dồn, lời báo dồn phách sẽ thay chỗ này
-    setMessage("Đã chèn beat trống. Chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím để đặt nốt.");
+    setMessage(t.insertedBeat);
     const relocate = commit(() => {
       const nb = new lib.model.Beat();
       nb.duration = beat.duration;
@@ -391,8 +396,8 @@ export function TabEditor({
     if (!x?.beat || !x.voice) return;
     const { lib, c, beat, voice } = x;
     const i = DURATIONS.indexOf(beat.duration);
-    if (i < 0 || i >= DURATIONS.length - 1) { setMessage("Nốt này đã ngắn nhất (móc ba), không chia được nữa."); return; }
-    setMessage(`Đã chia đôi thành 2 ${DURATION_NAME[DURATIONS[i + 1]]}. Beat sau đang trống: chọn dây rồi gõ số phím để chèn nốt.`);
+    if (i < 0 || i >= DURATIONS.length - 1) { setMessage(t.cantSplit); return; }
+    setMessage(t.split(DURATION_NAME[DURATIONS[i + 1]]));
     const relocate = commit(() => {
       beat.duration = DURATIONS[i + 1];
       const nb = new lib.model.Beat();
@@ -469,7 +474,7 @@ export function TabEditor({
     const at = c.bar + 1;
     commit(() => addBar(lib, score, at, score.masterBars[c.bar]));
     setCursor({ bar: at, beat: 0, string: c.string });
-    setMessage(`Đã thêm ô ${at + 1}.`);
+    setMessage(t.barAdded(at + 1));
   };
 
   /** Xoá ô đang chọn (giữ ít nhất một ô) */
@@ -477,7 +482,7 @@ export function TabEditor({
     const x = context(), score = apiRef.current?.score;
     if (!x || !score || score.masterBars.length <= 1) return;
     const { c } = x;
-    if (x.st.bars[c.bar].voices[0].beats.some((b) => b.notes.length) && !confirm(`Xoá ô ${c.bar + 1} cùng các nốt trong ô?`)) return;
+    if (x.st.bars[c.bar].voices[0].beats.some((b) => b.notes.length) && !confirm(t.confirmDeleteBar(c.bar + 1))) return;
     commit(() => {
       score.masterBars.splice(c.bar, 1);
       for (const tr of score.tracks) for (const s of tr.staves) s.bars.splice(c.bar, 1);
@@ -493,8 +498,7 @@ export function TabEditor({
     const [from, to] = barSpan();
     clipRef.current = { bytes: new lib.exporter.Gp7Exporter().export(api.score, null), from, to };
     setClipCount(to - from + 1);
-    const what = to > from ? `ô ${from + 1}–${to + 1}` : `ô ${from + 1}`;
-    setMessage(`Đã chép ${what}. Bấm vào ô cần dán rồi chọn “Dán đè” (⌘/Ctrl + V) để thay nốt trong ô đó, hoặc “Dán chèn” (Shift + ⌘/Ctrl + V) để thêm thành ô mới phía sau.`);
+    setMessage(t.copied(t.bars(from + 1, to + 1)));
   };
 
   /** Dán các ô đã chép: đè lên từ ô đang chọn trở đi (thiếu ô thì thêm), hoặc chèn thành ô mới ngay sau ô đang chọn */
@@ -522,8 +526,7 @@ export function TabEditor({
     rangeRef.current = null;
     // con trỏ sang ô ngay sau phần vừa dán → dán tiếp được liền
     setCursor({ bar: Math.min(at + n, st.bars.length - 1), beat: 0, string: c.string });
-    const where = n > 1 ? `ô ${at + 1}–${at + n}` : `ô ${at + 1}`;
-    setMessage(`Đã ${insert ? "chèn" : "dán đè"} vào ${where}. Dán nhầm thì bấm Hoàn tác (⌘/Ctrl + Z).`);
+    setMessage(t.pasted(insert, t.bars(at + 1, at + n)));
   };
 
   /** Bù phần thiếu của một ô bằng dấu lặng — ở đầu ô (nốt dồn về cuối, nối liền ô sau) hoặc ở cuối ô */
@@ -541,7 +544,7 @@ export function TabEditor({
     });
     const c = cursorRef.current;
     if (atStart && c.bar === barIndex) setCursor({ ...c, beat: c.beat + rests.length });
-    setMessage(`Đã bù ô ${barIndex + 1} bằng ${rests.length} dấu lặng ở ${atStart ? "đầu" : "cuối"} ô.`);
+    setMessage(t.filled(barIndex + 1, rests.length, atStart));
   };
 
   /** Bật/tắt tiếng đập “xx”: X trên 2 dây bass còn trống */
@@ -640,7 +643,7 @@ export function TabEditor({
       if (s < 1 || s > stringCount()) return;
       const fret = note.fret + openPitch(c.string) - openPitch(s);
       if (fret < 0 || fret > 24 || beat.notes.some((n) => n.string === toModel(s))) {
-        setMessage(`Không chuyển được: dây ${s} ${fret < 0 ? "không xuống thấp vậy được" : "đã có nốt hoặc phím quá cao"}.`);
+        setMessage(t.cantMove(s, fret < 0));
         return;
       }
       commit(() => { note.string = toModel(s); note.fret = fret; });
@@ -694,38 +697,38 @@ export function TabEditor({
       ? await saveHandler(encoded)
       : slug
         ? await saveScore(slug, encoded)
-        : { ok: false as const, error: "Chưa chọn bài để lưu" };
+        : { ok: false as const, error: t.noSong };
     setSaving(false);
     if (!result.ok) return setError(result.error);
     setDirty(false);
     if (saveHandler) return;
-    setMessage("✓ Đã lưu tab. Trang bài trên site đã cập nhật.");
+    setMessage(t.saved);
     router.refresh();
   }
 
   function onCancel() {
-    if (dirty && !confirm("Bỏ các thay đổi chưa lưu?")) return;
+    if (dirty && !confirm(t.confirmDiscard)) return;
     onClose();
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-surface p-4" aria-label="Sửa tab">
+    <section className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-surface p-4" aria-label={t.region}>
       <div className="sticky top-16 z-10 -mx-1 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface/95 p-2 backdrop-blur-md">
         <button type="button" onClick={() => apiRef.current?.playPause()} disabled={!ready} className={buttonSecondary}>
-          {playing ? "Tạm dừng" : "Nghe thử"}
+          {playing ? t.pause : t.play}
         </button>
         <button type="button" onClick={() => travel(-1)} disabled={!canUndo} className={buttonSecondary} title="Ctrl/⌘ + Z">
-          Hoàn tác
+          {t.undo}
         </button>
         <button type="button" onClick={() => travel(1)} disabled={!canRedo} className={buttonSecondary} title="Ctrl/⌘ + Shift + Z">
-          Làm lại
+          {t.redo}
         </button>
-        <div role="group" aria-label="Tempo nghe thử" className="flex h-10 items-stretch overflow-hidden rounded-lg border border-border">
+        <div role="group" aria-label={t.tempoGroup} className="flex h-10 items-stretch overflow-hidden rounded-lg border border-border">
           <button
             type="button"
             onClick={() => bpm && changeBpm(bpm - BPM_STEP)}
             disabled={!bpm || bpm <= BPM_MIN}
-            aria-label="Giảm tempo"
+            aria-label={t.slower}
             className="w-9 text-lg leading-none text-soft transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
           >
             −
@@ -734,7 +737,7 @@ export function TabEditor({
             type="button"
             onClick={() => startBpm && changeBpm(startBpm)}
             disabled={!bpm}
-            title={startBpm ? `Tempo nghe thử — bấm để về ${startBpm} bpm` : undefined}
+            title={startBpm ? t.tempoReset(startBpm) : undefined}
             className={`min-w-[76px] border-x border-border px-2 font-mono text-xs tabular-nums transition-colors hover:bg-surface-2 ${
               bpm && startBpm && bpm !== startBpm ? "text-accent-ink" : "text-soft"
             }`}
@@ -745,7 +748,7 @@ export function TabEditor({
             type="button"
             onClick={() => bpm && changeBpm(bpm + BPM_STEP)}
             disabled={!bpm || bpm >= BPM_MAX}
-            aria-label="Tăng tempo"
+            aria-label={t.faster}
             className="w-9 text-lg leading-none text-soft transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
           >
             +
@@ -753,25 +756,25 @@ export function TabEditor({
         </div>
         <span className="min-w-0 flex-1 truncate px-1 font-mono text-xs text-soft" aria-live="polite">{info}</span>
         <button type="button" onClick={onCancel} className={buttonSecondary}>
-          Đóng
+          {t.close}
         </button>
         <button type="button" onClick={onSave} disabled={(!dirty && !saveHandler) || saving} className={buttonPrimary}>
-          {saving ? "Đang lưu…" : dirty || saveHandler ? saveLabel : "Đã lưu"}
+          {saving ? t.saving : dirty || saveHandler ? saveLabel : t.savedShort}
         </button>
 
-        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2" role="toolbar" aria-label="Công cụ sửa nốt">
-          <ToolGroup label="Chèn nốt">
-            <Chip onClick={() => run(splitBeat)} disabled={!sel} title="Chia nốt đang chọn thành 2 nốt ngắn bằng nửa — ô không bị thừa phách (phím D)">
-              Chia đôi
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-2" role="toolbar" aria-label={t.toolbar}>
+          <ToolGroup label={t.gInsert}>
+            <Chip onClick={() => run(splitBeat)} disabled={!sel} title={t.splitTitle}>
+              {t.splitChip}
             </Chip>
-            <Chip onClick={() => run(() => insertBeat(false))} disabled={!sel} title="Chèn beat trống cùng trường độ phía trước (Shift + I)">
-              + Trước
+            <Chip onClick={() => run(() => insertBeat(false))} disabled={!sel} title={t.beforeTitle}>
+              {t.before}
             </Chip>
-            <Chip onClick={() => run(() => insertBeat(true))} disabled={!sel} title="Chèn beat trống cùng trường độ phía sau (phím I)">
-              + Sau
+            <Chip onClick={() => run(() => insertBeat(true))} disabled={!sel} title={t.afterTitle}>
+              {t.after}
             </Chip>
           </ToolGroup>
-          <ToolGroup label="Phím">
+          <ToolGroup label={t.gFret}>
             <input
               type="number"
               min={0}
@@ -779,8 +782,8 @@ export function TabEditor({
               inputMode="numeric"
               placeholder="0–24"
               disabled={!sel}
-              aria-label="Số phím cho dây đang chọn — Enter để đặt"
-              title="Gõ số phím rồi Enter: đặt nốt vào dây đang chọn (dây trống thì thêm nốt → thành nốt đôi / hợp âm)"
+              aria-label={t.fretAria}
+              title={t.fretTitle}
               className="h-8 w-16 rounded-md border border-border bg-bg px-2 text-xs text-text outline-none focus:border-accent disabled:opacity-40"
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;
@@ -792,34 +795,34 @@ export function TabEditor({
                 focusHost();
               }}
             />
-            <Chip onClick={() => run(deleteNote)} disabled={!sel?.note} title="Xoá nốt đang chọn (Delete)">Xoá nốt</Chip>
-            <Chip onClick={() => run(deleteBeat)} disabled={!sel} title="Xoá cả beat (Shift + Delete)">Xoá beat</Chip>
+            <Chip onClick={() => run(deleteNote)} disabled={!sel?.note} title={t.deleteNoteTitle}>{t.deleteNote}</Chip>
+            <Chip onClick={() => run(deleteBeat)} disabled={!sel} title={t.deleteBeatTitle}>{t.deleteBeat}</Chip>
           </ToolGroup>
-          <ToolGroup label="Trường độ">
+          <ToolGroup label={t.gDuration}>
             {DURATIONS.map((d) => (
-              <Chip key={d} on={sel?.duration === d} onClick={() => run(() => setDuration(d))} disabled={!sel} title={`Nốt ${DURATION_NAME[d]} (+ / − để đổi nhanh)`}>
-                {DURATION_SHORT[d]}
+              <Chip key={d} on={sel?.duration === d} onClick={() => run(() => setDuration(d))} disabled={!sel} title={t.durationTitle(DURATION_NAME[d])}>
+                {t.durationShort[d]}
               </Chip>
             ))}
-            <Chip on={!!sel?.dots} onClick={() => run(toggleDot)} disabled={!sel} title="Chấm dôi (phím .)">Chấm</Chip>
+            <Chip on={!!sel?.dots} onClick={() => run(toggleDot)} disabled={!sel} title={t.dotTitle}>{t.dot}</Chip>
           </ToolGroup>
-          <ToolGroup label="Ô nhịp">
-            <Chip onClick={() => run(insertBar)} disabled={!sel} title="Thêm một ô trống ngay sau ô đang chọn">+ Ô sau</Chip>
-            <Chip onClick={() => run(deleteBar)} disabled={!sel} title="Xoá ô đang chọn">Xoá ô</Chip>
-            <Chip onClick={() => run(copyBars)} disabled={!sel} title="Chép ô đang chọn (⌘/Ctrl + C). Chép nhiều ô: giữ Shift rồi bấm sang ô khác, hoặc Shift + ← →">
-              {span[1] > span[0] ? `Chép ${span[1] - span[0] + 1} ô` : "Chép ô"}
+          <ToolGroup label={t.gBars}>
+            <Chip onClick={() => run(insertBar)} disabled={!sel} title={t.addBarTitle}>{t.addBar}</Chip>
+            <Chip onClick={() => run(deleteBar)} disabled={!sel} title={t.deleteBarTitle}>{t.deleteBar}</Chip>
+            <Chip onClick={() => run(copyBars)} disabled={!sel} title={t.copyTitle}>
+              {t.copy(span[1] - span[0] + 1)}
             </Chip>
-            <Chip onClick={() => run(() => pasteBars(false))} disabled={!sel || !clipCount} title="Dán đè các ô đã chép lên ô đang chọn trở đi (⌘/Ctrl + V)">
-              Dán đè{clipCount > 1 ? ` ${clipCount} ô` : ""}
+            <Chip onClick={() => run(() => pasteBars(false))} disabled={!sel || !clipCount} title={t.pasteOverTitle}>
+              {t.pasteOver(clipCount)}
             </Chip>
-            <Chip onClick={() => run(() => pasteBars(true))} disabled={!sel || !clipCount} title="Chèn các ô đã chép thành ô mới ngay sau ô đang chọn (Shift + ⌘/Ctrl + V)">
-              Dán chèn
+            <Chip onClick={() => run(() => pasteBars(true))} disabled={!sel || !clipCount} title={t.pasteInsertTitle}>
+              {t.pasteInsert}
             </Chip>
           </ToolGroup>
-          <ToolGroup label="Kỹ thuật">
-            <Chip onClick={() => run(toggleDead)} disabled={!sel} title="Bật/tắt tiếng đập “xx” (phím X)">xx</Chip>
-            <Chip onClick={() => run(toggleSlide)} disabled={!sel?.note} title="Luyến sang nốt sau (phím S)">Luyến</Chip>
-            <Chip onClick={() => run(toggleLetRing)} disabled={!sel?.note} title="Ngân (phím L)">Ngân</Chip>
+          <ToolGroup label={t.gTechnique}>
+            <Chip onClick={() => run(toggleDead)} disabled={!sel} title={t.deadTitle}>xx</Chip>
+            <Chip onClick={() => run(toggleSlide)} disabled={!sel?.note} title={t.slideTitle}>{t.slide}</Chip>
+            <Chip onClick={() => run(toggleLetRing)} disabled={!sel?.note} title={t.letRingTitle}>{t.letRing}</Chip>
           </ToolGroup>
         </div>
       </div>
@@ -828,10 +831,7 @@ export function TabEditor({
       {message && !error && <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-2 text-sm text-accent-ink">{message}</p>}
       {warnings.length > 0 && (
         <div role="alert" className="flex flex-col gap-2 rounded-xl border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">
-          <p>
-            <b>⚠ Có ô chưa đúng số phách.</b> Khi phát, mỗi ô luôn chiếm đủ số phách của nhịp: ô <b>thiếu</b> sẽ có khoảng lặng ở cuối ô,
-            ô <b>thừa</b> thì nốt cuối vang chồng lên đầu ô sau (nghe như bị mất nốt). Đổi trường độ cho khớp, hoặc:
-          </p>
+          <p>{t.warnLead}</p>
           <ul className="flex flex-col gap-1.5">
             {warnings.map((w) => (
               <li key={w.bar} className="flex flex-wrap items-center gap-2">
@@ -840,22 +840,22 @@ export function TabEditor({
                   onClick={() => setCursor({ bar: w.bar, beat: 0, string: cursorRef.current.string })}
                   className="font-semibold underline-offset-4 hover:underline"
                 >
-                  Ô {w.bar + 1}
+                  {t.bar(w.bar + 1)}
                 </button>
-                <span>{w.diff < 0 ? "thiếu" : "thừa"} {formatBeats(Math.abs(w.diff))}</span>
+                <span>{w.diff < 0 ? t.short : t.over} {formatBeats(Math.abs(w.diff), t)}</span>
                 {w.diff < 0 && (
                   <>
-                    <Chip onClick={() => run(() => fillBar(w.bar, true))} title="Thêm dấu lặng ở đầu ô — các nốt dồn về cuối và nối liền sang ô sau (hợp với ô mở đầu / lấy đà)">
-                      Bù lặng đầu ô
+                    <Chip onClick={() => run(() => fillBar(w.bar, true))} title={t.fillStartTitle}>
+                      {t.fillStart}
                     </Chip>
-                    <Chip onClick={() => run(() => fillBar(w.bar, false))} title="Thêm dấu lặng ở cuối ô">
-                      Bù lặng cuối ô
+                    <Chip onClick={() => run(() => fillBar(w.bar, false))} title={t.fillEndTitle}>
+                      {t.fillEnd}
                     </Chip>
                   </>
                 )}
                 {w.diff > 0 && (
-                  <Chip onClick={() => run(() => commit(() => {}, w.bar))} title="Bớt dấu lặng cuối ô, còn thừa thì đẩy các nốt quá vạch nhịp sang đầu ô sau (như Guitar Pro)">
-                    Dồn sang ô sau
+                  <Chip onClick={() => run(() => commit(() => {}, w.bar))} title={t.pushNextTitle}>
+                    {t.pushNext}
                   </Chip>
                 )}
               </li>
@@ -865,26 +865,12 @@ export function TabEditor({
       )}
 
       <details className="rounded-xl border border-line px-4 py-2 text-sm text-muted" open>
-        <summary className="cursor-pointer font-semibold text-soft">Cách dùng &amp; phím tắt</summary>
-        <p className="mt-2 text-soft">
-          <b>Chèn nốt:</b> chọn nốt → <b>Chia đôi</b> → beat mới trống hiện ra ngay sau → bấm vào dây muốn đặt → gõ số phím.
-          {" "}<b>Nốt đôi / hợp âm:</b> bấm vào dây trống ngay trên/dưới nốt có sẵn → gõ số phím.
-        </p>
+        <summary className="cursor-pointer font-semibold text-soft">{t.helpTitle}</summary>
+        <p className="mt-2 text-soft">{t.helpLead}</p>
         <ul className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
-          <li><b className="text-soft">Bấm vào nốt</b>: chọn nốt · <b className="text-soft">bấm vào dây trống</b>: chọn dây đó</li>
-          <li><b className="text-soft">← →</b>: beat trước / sau (ô chưa đủ phách thì → tạo thêm chỗ trống trong ô, như Guitar Pro) · <b className="text-soft">↑ ↓</b>: đổi dây</li>
-          <li><b className="text-soft">0–9</b>: đặt phím (gõ liền 2 số cho 10–24); dây trống thì thêm nốt → nốt đôi / hợp âm</li>
-          <li><b className="text-soft">D</b>: chia đôi nốt để chèn thêm nốt mà ô không thừa phách</li>
-          <li><b className="text-soft">I</b> / <b className="text-soft">Shift + I</b>: chèn beat trống sau / trước</li>
-          <li><b className="text-soft">Shift + ↑ ↓</b>: chuyển nốt sang dây bên cạnh, giữ cao độ</li>
-          <li><b className="text-soft">Delete</b>: xoá nốt · <b className="text-soft">Shift + Delete</b>: xoá cả beat</li>
-          <li><b className="text-soft">+ / −</b>: dài hơn / ngắn hơn · <b className="text-soft">.</b>: chấm dôi (ô bị thừa phách thì tự bớt dấu lặng cuối ô hoặc dồn nốt sang ô sau)</li>
-          <li><b className="text-soft">X</b>: bật/tắt tiếng đập “xx” · <b className="text-soft">S</b>: luyến · <b className="text-soft">L</b>: ngân</li>
-          <li>
-            <b className="text-soft">⌘/Ctrl + C</b>: chép ô · <b className="text-soft">⌘/Ctrl + V</b>: dán đè · <b className="text-soft">Shift + ⌘/Ctrl + V</b>: dán chèn ·
-            chọn nhiều ô: <b className="text-soft">Shift + bấm</b> hoặc <b className="text-soft">Shift + ← →</b>
-          </li>
-          <li><b className="text-soft">Space</b>: nghe thử · <b className="text-soft">Ctrl/⌘ + Z</b>: hoàn tác</li>
+          {t.help.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
         </ul>
       </details>
 
@@ -898,12 +884,12 @@ export function TabEditor({
             pointRef.current = { x: e.clientX - r.left, y: e.clientY - r.top, shift: e.shiftKey };
           }}
           className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-          aria-label="Vùng sửa tab — bấm vào nốt rồi dùng bàn phím"
+          aria-label={t.canvas}
         />
         <div ref={rangeBoxRef} aria-hidden className="pointer-events-none" style={{ zIndex: 4 }} />
         <div ref={boxRef} aria-hidden className="pointer-events-none absolute hidden rounded-md border-2 border-accent bg-accent/15" style={{ zIndex: 5 }} />
       </div>
-      {!ready && !error && <p className="text-sm text-muted">Đang nạp tab…</p>}
+      {!ready && !error && <p className="text-sm text-muted">{t.loading}</p>}
     </section>
   );
 }
@@ -1041,7 +1027,7 @@ function addBar(lib: AlphaTabLib, score: model.Score, at: number, ref: model.Mas
  * rồi xét tiếp ô sau. Không bao giờ để nốt tràn ô — khi phát, nốt tràn sẽ vang chồng lên đầu ô sau.
  * Trả về lời báo cho người dùng, hoặc null nếu không phải dồn gì.
  */
-function reflow(lib: AlphaTabLib, score: model.Score, st: model.Staff, from: number, keep: Set<Beat>): string | null {
+function reflow(lib: AlphaTabLib, score: model.Score, st: model.Staff, from: number, keep: Set<Beat>, t: EditorText): string | null {
   let ate = 0, added = 0;
   const pushed: number[] = [];
   for (let i = Math.max(0, from); i < st.bars.length; i++) {
@@ -1077,14 +1063,13 @@ function reflow(lib: AlphaTabLib, score: model.Score, st: model.Staff, from: num
     pushed.push(i);
   }
   if (!ate && !pushed.length) return null;
-  if (!pushed.length) return "Ô vừa sửa thừa phách → đã bớt dấu lặng ở cuối ô cho vừa đủ.";
-  const first = pushed[0] + 1;
-  return `Ô ${first} thừa phách → đã dồn nốt cuối ô sang đầu ô ${first + 1}${added ? " (thêm ô mới)" : ""}, như Guitar Pro.`;
+  if (!pushed.length) return t.trimmed;
+  return t.pushed(pushed[0] + 1, added > 0);
 }
 
 /** 960 tick = 1 phách (nốt đen) → "1¼ phách"; lẻ hơn móc kép thì đếm móc ba */
-function formatBeats(ticks: number) {
-  if (ticks % 240 !== 0) return `${ticks / 120} móc ba`;
+function formatBeats(ticks: number, t: EditorText) {
+  if (ticks % 240 !== 0) return t.thirtySeconds(ticks / 120);
   const whole = Math.floor(ticks / 960), frac = ["", "¼", "½", "¾"][(ticks % 960) / 240];
-  return `${whole || !frac ? whole : ""}${frac} phách`;
+  return t.beats(`${whole || !frac ? whole : ""}${frac}`);
 }

@@ -5,12 +5,15 @@ import { useState } from "react";
 import { buttonSecondary } from "@/app/admin/ui";
 import { NewTabForm } from "@/components/editor/NewTabForm";
 import { TabPlayer } from "@/components/TabPlayer";
+import { langOf, type Lang } from "@/i18n";
+import { contributeText } from "./contribute-i18n";
 import { ContributionForm } from "./ContributionForm";
 
 // Trình soạn nặng (alphaTab) → chỉ tải khi bấm "Mở trình soạn"
 const TabEditor = dynamic(() => import("@/components/editor/TabEditor").then((m) => m.TabEditor), {
   ssr: false,
-  loading: () => <p className="text-sm text-muted">Đang mở trình soạn…</p>,
+  // chỗ chờ không nhận được props → đoán ngôn ngữ theo đường dẫn
+  loading: () => <p className="text-sm text-muted">{contributeText[langOf(location.pathname)].compose.opening}</p>,
 });
 
 type Step =
@@ -19,18 +22,16 @@ type Step =
   | { kind: "send"; notation: string; bpm: number };
 
 /** Soạn tab từ đầu ngay trên trình duyệt: chọn khung tab → soạn với thanh công cụ → điền thông tin → gửi duyệt */
-export function ComposeTab() {
+export function ComposeTab({ lang }: { lang: Lang }) {
+  const t = contributeText[lang];
   const [step, setStep] = useState<Step>({ kind: "setup" });
   const [notice, setNotice] = useState<string>();
 
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-xl font-semibold">Tự soạn tab</h2>
-        <p className="text-sm text-muted">
-          Không có file Guitar Pro? Tạo khung tab trống rồi bấm vào từng chỗ để điền số phím, đổi trường độ, thêm luyến / ngân,
-          nghe thử ngay — xong thì gửi.
-        </p>
+        <h2 className="text-xl font-semibold">{t.compose.heading}</h2>
+        <p className="text-sm text-muted">{t.compose.intro}</p>
       </div>
 
       {notice && (
@@ -41,7 +42,8 @@ export function ComposeTab() {
 
       {step.kind === "setup" && (
         <NewTabForm
-          submitLabel="Mở trình soạn"
+          submitLabel={t.compose.open}
+          lang={lang}
           onCreated={(notation, bpm) => {
             setNotice(undefined);
             setStep({ kind: "edit", notation, bpm, isNew: true });
@@ -53,7 +55,8 @@ export function ComposeTab() {
         <TabEditor
           notation={step.notation}
           isNew={step.isNew}
-          saveLabel="Xong, gửi bài →"
+          saveLabel={t.compose.done}
+          lang={lang}
           onSave={async (notation) => {
             setStep({ kind: "send", notation, bpm: step.bpm });
             return { ok: true };
@@ -65,26 +68,27 @@ export function ComposeTab() {
       {step.kind === "send" && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/40 bg-fresh px-4 py-3">
-            <p className="text-sm text-accent-ink">🎸 Tab đã soạn xong. Nghe lại lần cuối, điền thông tin bài rồi gửi.</p>
+            <p className="text-sm text-accent-ink">{t.compose.finished}</p>
             <button
               type="button"
               onClick={() => setStep({ kind: "edit", notation: step.notation, bpm: step.bpm, isNew: false })}
               className={buttonSecondary}
             >
-              ← Sửa tiếp
+              {t.compose.editMore}
             </button>
           </div>
-          <TabPlayer notation={step.notation} />
+          <TabPlayer notation={step.notation} lang={lang} />
           <ContributionForm
             notation={step.notation}
             tempo={step.bpm}
-            cancelLabel="Bỏ tab này"
+            cancelLabel={t.compose.discard}
+            lang={lang}
             onCancel={() => {
-              if (confirm("Bỏ tab vừa soạn?")) setStep({ kind: "setup" });
+              if (confirm(t.compose.confirmDiscard)) setStep({ kind: "setup" });
             }}
             onSent={(title) => {
               setStep({ kind: "setup" });
-              setNotice(`✓ Đã gửi “${title}”. Bài sẽ hiện trên site sau khi admin duyệt.`);
+              setNotice(t.sent(title));
             }}
           />
         </>

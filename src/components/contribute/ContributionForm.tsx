@@ -3,8 +3,10 @@
 import { useId, useState } from "react";
 import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
 import { collections } from "@/config/site";
+import { dict, type Lang } from "@/i18n";
+import { submitContribution } from "@/lib/contribute-actions";
 import { LEVELS } from "@/lib/song-model";
-import { submitContribution } from "./actions";
+import { contributeText } from "./contribute-i18n";
 
 /** Thông tin bài + nút gửi — dùng chung cho tab "Tải file lên" và "Tự soạn tab" */
 export function ContributionForm({
@@ -12,7 +14,8 @@ export function ContributionForm({
   tempo,
   defaultTitle = "",
   defaultArtist = "",
-  cancelLabel = "Huỷ",
+  cancelLabel,
+  lang,
   onCancel,
   onSent,
 }: {
@@ -21,9 +24,11 @@ export function ContributionForm({
   defaultTitle?: string;
   defaultArtist?: string;
   cancelLabel?: string;
+  lang: Lang;
   onCancel: () => void;
   onSent: (title: string) => void;
 }) {
+  const t = contributeText[lang].form;
   const uid = useId(); // form có thể hiện ở cả 2 tab cùng lúc → id phải khác nhau
   const id = (name: string) => `${uid}-${name}`;
   const [sending, setSending] = useState(false);
@@ -42,24 +47,24 @@ export function ContributionForm({
       tempo,
       rights: form.get("rights") === "on",
       website: String(form.get("website") ?? ""),
-    }).catch(() => ({ ok: false as const, error: "Không gửi được — kiểm tra mạng rồi thử lại." }));
+    }, lang).catch(() => ({ ok: false as const, error: t.network }));
     setSending(false);
     if (!result.ok) return setError(result.error);
     onSent(result.title);
   }
 
   return (
-    <form action={onSubmit} className="grid gap-4 rounded-xl border border-line bg-bg p-4 sm:grid-cols-2" aria-label="Thông tin bài">
-      <Field label="Tên bài *" id={id("title")} className="sm:col-span-2">
+    <form action={onSubmit} className="grid gap-4 rounded-xl border border-line bg-bg p-4 sm:grid-cols-2" aria-label={t.region}>
+      <Field label={t.title} id={id("title")} className="sm:col-span-2">
         <input id={id("title")} name="title" required maxLength={200} defaultValue={defaultTitle} className={inputClass} />
       </Field>
-      <Field label="Ca sĩ / tác giả bài hát" id={id("artist")}>
+      <Field label={t.artist} id={id("artist")}>
         <input id={id("artist")} name="artist" maxLength={200} defaultValue={defaultArtist} className={inputClass} />
       </Field>
-      <Field label="Tên bạn (tuỳ chọn)" id={id("name")} hint="Hiện là người soạn tab trên trang bài">
+      <Field label={t.name} id={id("name")} hint={t.nameHint}>
         <input id={id("name")} name="name" maxLength={60} autoComplete="nickname" className={inputClass} />
       </Field>
-      <Field label="Kho" id={id("collection")}>
+      <Field label={t.collection} id={id("collection")}>
         <select id={id("collection")} name="collection" defaultValue="melody" className={inputClass}>
           {Object.values(collections).map((c) => (
             <option key={c.slug} value={c.slug}>
@@ -68,10 +73,12 @@ export function ContributionForm({
           ))}
         </select>
       </Field>
-      <Field label="Độ khó" id={id("level")}>
+      <Field label={t.level} id={id("level")}>
         <select id={id("level")} name="level" defaultValue="Vừa" className={inputClass}>
           {LEVELS.map((l) => (
-            <option key={l}>{l}</option>
+            <option key={l} value={l}>
+              {dict[lang].level[l]}
+            </option>
           ))}
         </select>
       </Field>
@@ -82,9 +89,7 @@ export function ContributionForm({
       </div>
       <label className="flex items-start gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm sm:col-span-2">
         <input type="checkbox" name="rights" required className="mt-0.5 size-5 shrink-0 accent-[var(--accent-ink)]" />
-        <span>
-          <b>Tôi tự soạn tab này</b> (hoặc được người soạn cho phép đăng). Tab có thể bị gỡ nếu chủ sở hữu bản quyền yêu cầu.
-        </span>
+        <span>{t.rights}</span>
       </label>
       {error && (
         <p role="alert" className="rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300 sm:col-span-2">
@@ -93,10 +98,10 @@ export function ContributionForm({
       )}
       <div className="flex flex-wrap gap-2 sm:col-span-2">
         <button type="submit" disabled={sending} className={buttonPrimary}>
-          {sending ? "Đang gửi…" : "Gửi đóng góp"}
+          {sending ? t.sending : t.submit}
         </button>
         <button type="button" onClick={onCancel} disabled={sending} className={buttonSecondary}>
-          {cancelLabel}
+          {cancelLabel ?? t.cancel}
         </button>
       </div>
     </form>

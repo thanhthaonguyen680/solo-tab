@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
 import { TabPlayer } from "@/components/TabPlayer";
 import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS } from "@/lib/notation-format";
+import type { Lang } from "@/i18n";
 import { readPdfTab, readScoreFile, type ScoreFile } from "@/lib/score-reader";
+import { contributeText } from "./contribute-i18n";
 import { ContributionForm } from "./ContributionForm";
 
 type Ready = {
@@ -23,7 +25,8 @@ type Ready = {
 type State = { step: "idle" } | { step: "reading"; fileName: string } | ({ step: "ready" } & Ready);
 
 /** Đẩy file PDF / Guitar Pro lên → đọc ngay trên trình duyệt thành phần nhạc phát được → nghe thử → gửi duyệt */
-export function ContributeUploader() {
+export function ContributeUploader({ lang }: { lang: Lang }) {
+  const t = contributeText[lang];
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ step: "idle" });
   const [error, setError] = useState<string>();
@@ -35,12 +38,12 @@ export function ContributeUploader() {
     if (!file) return;
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf && !isScoreFile(file.name)) {
-      return setError(`Chọn file PDF hoặc file Guitar Pro / MusicXML (${SCORE_FILE_EXTENSIONS.join(", ")}).`);
+      return setError(t.upload.wrongType(SCORE_FILE_EXTENSIONS.join(", ")));
     }
     setState({ step: "reading", fileName: file.name });
     try {
       if (isPdf) {
-        const tab = await readPdfTab(file);
+        const tab = await readPdfTab(file, lang);
         if (tab.notation === null) throw new Error(tab.reason);
         setState({
           step: "ready",
@@ -55,7 +58,7 @@ export function ContributeUploader() {
           oddBars: tab.report.oddBars,
         });
       } else {
-        const score = await readScoreFile(file);
+        const score = await readScoreFile(file, lang);
         const guitar = score.tracks.find((t) => t.notes > 0) ?? score.tracks[0];
         setState({
           step: "ready",
@@ -72,7 +75,7 @@ export function ContributeUploader() {
       }
     } catch (e) {
       setState({ step: "idle" });
-      setError(e instanceof Error ? e.message : "Không đọc được file.");
+      setError(e instanceof Error ? e.message : t.upload.readFail);
     } finally {
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -85,11 +88,8 @@ export function ContributeUploader() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Tải file lên</h2>
-          <p className="text-sm text-muted">
-            <b className="text-soft">File Guitar Pro</b> (.gp, .gp5, .gpx…) / MusicXML, hoặc <b className="text-soft">PDF xuất từ Guitar Pro</b>.
-            Hệ thống tự dựng phần nhạc phát được — nghe thử rồi gửi.
-          </p>
+          <h2 className="text-xl font-semibold">{t.upload.heading}</h2>
+          <p className="text-sm text-muted">{t.upload.intro}</p>
         </div>
         <input
           ref={inputRef}
@@ -101,7 +101,7 @@ export function ContributeUploader() {
           disabled={state.step === "reading"}
         />
         <label htmlFor="contribute-file" className={`${state.step === "ready" ? buttonSecondary : buttonPrimary} cursor-pointer`}>
-          {state.step === "ready" ? "Chọn file khác" : "Chọn file PDF / Guitar Pro"}
+          {state.step === "ready" ? t.upload.pickOther : t.upload.pick}
         </label>
       </div>
 
@@ -117,39 +117,39 @@ export function ContributeUploader() {
       )}
       {state.step === "reading" && (
         <p role="status" className="text-sm font-semibold text-soft">
-          Đang đọc “{state.fileName}”…
+          {t.upload.reading(state.fileName)}
         </p>
       )}
 
       {state.step === "ready" && notation && (
         <>
           <p className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm text-accent-ink">
-            🎸 Đã dựng phần nhạc từ <b>{state.fileName}</b>: {state.bars} ô nhịp. Bấm phát để nghe thử.
+            {t.upload.built(state.fileName, state.bars)}
             {state.oddBars.length > 0 && (
               <span className="mt-1 block text-soft">
-                Có thể đọc chưa chuẩn ở ô {state.oddBars.slice(0, 8).join(", ")} — admin sẽ nghe và chỉnh khi duyệt.
+                {t.upload.oddBars(state.oddBars.slice(0, 8).join(", "))}
               </span>
             )}
           </p>
 
           {state.score && state.score.tracks.length > 1 && (
             <label className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="font-semibold">Track hiển thị:</span>
+              <span className="font-semibold">{t.upload.track}</span>
               <select
                 value={state.track}
                 onChange={(e) => setState({ ...state, track: Number(e.target.value) })}
                 className={`${inputClass} w-auto`}
               >
-                {state.score.tracks.map((t) => (
-                  <option key={t.index} value={t.index}>
-                    {t.name} ({t.notes} nốt)
+                {state.score.tracks.map((tr) => (
+                  <option key={tr.index} value={tr.index}>
+                    {tr.name} ({t.upload.notes(tr.notes)})
                   </option>
                 ))}
               </select>
             </label>
           )}
 
-          <TabPlayer key={`${state.fileName}:${state.track}`} notation={notation} />
+          <TabPlayer key={`${state.fileName}:${state.track}`} notation={notation} lang={lang} />
 
           <ContributionForm
             key={state.fileName}
@@ -157,10 +157,11 @@ export function ContributeUploader() {
             tempo={state.tempo}
             defaultTitle={state.title}
             defaultArtist={state.artist}
+            lang={lang}
             onCancel={() => setState({ step: "idle" })}
             onSent={(title) => {
               setState({ step: "idle" });
-              setNotice(`✓ Đã gửi “${title}”. Bài sẽ hiện trên site sau khi admin duyệt.`);
+              setNotice(t.sent(title));
             }}
           />
         </>

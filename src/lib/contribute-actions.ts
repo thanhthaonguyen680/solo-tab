@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { collections } from "@/config/site";
+import type { Lang } from "@/i18n";
 import { sql } from "@/lib/db";
 import { isFileNotation, isValidFileNotation } from "@/lib/notation-format";
 import { LEVELS, NOTATION_MAX_CHARS, slugify } from "@/lib/song-model";
@@ -29,6 +30,33 @@ export type Contribution = {
 
 export type ContributionResult = { ok: true; title: string } | { ok: false; error: string };
 
+const ERRORS = {
+  vi: {
+    title: "Nhập tên bài (tối đa 200 ký tự)",
+    artist: "Tên ca sĩ / tác giả tối đa 200 ký tự",
+    name: "Tên của bạn tối đa 60 ký tự",
+    collection: "Chọn kho bài",
+    level: "Chọn độ khó",
+    rights: "Bạn cần xác nhận mình tự soạn (hoặc được phép đăng) tab này",
+    notation: "Dữ liệu tab không hợp lệ hoặc quá lớn",
+    tooManyMine: (n: number) => `Bạn đang có ${n} bài chờ duyệt — đợi admin duyệt bớt rồi gửi tiếp nhé`,
+    tooManyTotal: "Đang có quá nhiều bài chờ duyệt — bạn quay lại sau ít hôm nhé",
+    slug: "Không tạo được đường dẫn cho bài — thử đổi tên bài",
+  },
+  en: {
+    title: "Enter a song title (up to 200 characters)",
+    artist: "Artist name can be up to 200 characters",
+    name: "Your name can be up to 60 characters",
+    collection: "Choose a collection",
+    level: "Choose a level",
+    rights: "Please confirm you arranged this tab yourself (or have permission to post it)",
+    notation: "The tab data is invalid or too large",
+    tooManyMine: (n: number) => `You already have ${n} tabs waiting for review — please wait until a few are reviewed before sending more`,
+    tooManyTotal: "There are a lot of tabs waiting for review right now — please come back in a few days",
+    slug: "Couldn't create a link for this song — try a different title",
+  },
+} satisfies Record<Lang, unknown>;
+
 /** IP người gửi, băm SHA-256 — không lưu IP gốc */
 async function submitterHash() {
   const h = await headers();
@@ -37,24 +65,25 @@ async function submitterHash() {
 }
 
 /** Ai cũng gửi được (không cần tài khoản): tab đã dựng sẵn trên trình duyệt → chờ admin duyệt */
-export async function submitContribution(c: Contribution): Promise<ContributionResult> {
+export async function submitContribution(c: Contribution, lang: Lang = "vi"): Promise<ContributionResult> {
+  const t = ERRORS[lang === "en" ? "en" : "vi"];
   const title = String(c?.title ?? "").trim();
   if (c?.website) return { ok: true, title }; // bot
 
   const artist = String(c.artist ?? "").trim();
   const name = String(c.name ?? "").trim().replace(/\s+/g, " ");
-  if (!title || title.length > 200) return { ok: false, error: "Nhập tên bài (tối đa 200 ký tự)" };
-  if (artist.length > 200) return { ok: false, error: "Tên ca sĩ / tác giả tối đa 200 ký tự" };
-  if (name.length > 60) return { ok: false, error: "Tên của bạn tối đa 60 ký tự" };
-  if (!Object.hasOwn(collections, c.collection)) return { ok: false, error: "Chọn kho bài" };
-  if (!(LEVELS as readonly string[]).includes(c.level)) return { ok: false, error: "Chọn độ khó" };
-  if (c.rights !== true) return { ok: false, error: "Bạn cần xác nhận mình tự soạn (hoặc được phép đăng) tab này" };
+  if (!title || title.length > 200) return { ok: false, error: t.title };
+  if (artist.length > 200) return { ok: false, error: t.artist };
+  if (name.length > 60) return { ok: false, error: t.name };
+  if (!Object.hasOwn(collections, c.collection)) return { ok: false, error: t.collection };
+  if (!(LEVELS as readonly string[]).includes(c.level)) return { ok: false, error: t.level };
+  if (c.rights !== true) return { ok: false, error: t.rights };
 
   const notation = typeof c.notation === "string" ? c.notation : "";
   const notationOk = isFileNotation(notation)
     ? isValidFileNotation(notation)
     : notation.length > 0 && notation.length <= NOTATION_MAX_CHARS && /\|/.test(notation);
-  if (!notationOk) return { ok: false, error: "Dữ liệu tab không hợp lệ hoặc quá lớn" };
+  if (!notationOk) return { ok: false, error: t.notation };
   const bpm = Number.isInteger(c.tempo) && c.tempo! >= 20 && c.tempo! <= 400 ? c.tempo : null;
 
   const who = await submitterHash();
@@ -62,10 +91,10 @@ export async function submitContribution(c: Contribution): Promise<ContributionR
     select count(*) filter (where submitter_hash = ${who})::int as mine, count(*)::int as total
     from songs where status = 'pending'`;
   if (mine >= MAX_PENDING_PER_SUBMITTER) {
-    return { ok: false, error: `Bạn đang có ${mine} bài chờ duyệt — đợi admin duyệt bớt rồi gửi tiếp nhé` };
+    return { ok: false, error: t.tooManyMine(mine) };
   }
   if (total >= MAX_PENDING_TOTAL) {
-    return { ok: false, error: "Đang có quá nhiều bài chờ duyệt — bạn quay lại sau ít hôm nhé" };
+    return { ok: false, error: t.tooManyTotal };
   }
 
   // Đường dẫn trùng với bài khác → thêm số: ten-bai-2, ten-bai-3…
@@ -81,5 +110,5 @@ export async function submitContribution(c: Contribution): Promise<ContributionR
       returning slug`;
     if (rows.length) return { ok: true, title };
   }
-  return { ok: false, error: "Không tạo được đường dẫn cho bài — thử đổi tên bài" };
+  return { ok: false, error: t.slug };
 }

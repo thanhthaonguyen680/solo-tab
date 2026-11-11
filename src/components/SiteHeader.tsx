@@ -22,7 +22,7 @@ export function SiteHeader({ lang = "vi", switcher = true }: { lang?: Lang; swit
             </Link>
           ))}
           <Link
-            href="/dong-gop"
+            href={paths.contribute(lang)}
             className="mr-1 rounded-lg border border-accent/40 px-2 py-2 font-semibold sm:mr-0 text-accent-ink transition-colors hover:bg-fresh sm:px-3"
           >
             {t.nav.contribute}

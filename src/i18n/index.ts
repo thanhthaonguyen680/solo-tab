@@ -1,7 +1,7 @@
 /**
  * Song ngữ VI / EN cho phần đọc tab của site công khai.
  * Tiếng Việt giữ link cũ (/bai/…), tiếng Anh nằm dưới /en với đường dẫn tiếng Anh (/en/song/…).
- * Trang admin, đăng nhập, đóng góp vẫn chỉ có tiếng Việt.
+ * Trang đóng góp: /dong-gop ↔ /en/contribute. Trang admin chỉ có tiếng Việt.
  * Dùng được cả ở server lẫn client component (không có gì bí mật ở đây).
  */
 import { formatVnd } from "@/config/site";
@@ -198,6 +198,7 @@ export const paths = {
   collection: (lang: Lang, slug: string) => (lang === "en" ? `/en/${slug}` : `/${slug}`),
   song: (lang: Lang, slug: string) => (lang === "en" ? `/en/song/${slug}` : `/bai/${slug}`),
   author: (lang: Lang, id: number | string) => (lang === "en" ? `/en/author/${id}` : `/tac-gia/${id}`),
+  contribute: (lang: Lang) => (lang === "en" ? "/en/contribute" : "/dong-gop"),
 };
 
 export function langOf(pathname: string): Lang {
@@ -212,12 +213,14 @@ export function counterpart(pathname: string): string {
     if (!section) return "/";
     if (section === "song" && id) return paths.song("vi", id);
     if (section === "author" && id) return paths.author("vi", id);
+    if (section === "contribute") return paths.contribute("vi");
     return parts.length === 2 ? paths.collection("vi", section) : "/";
   }
   const [section, id] = parts;
   if (!section) return "/en";
   if (section === "bai" && id) return paths.song("en", id);
   if (section === "tac-gia" && id) return paths.author("en", id);
+  if (section === "dong-gop") return paths.contribute("en");
   if (section === "solo" || section === "melody") return paths.collection("en", section);
   return "/en";
 }

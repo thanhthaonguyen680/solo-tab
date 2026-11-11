@@ -4,6 +4,8 @@ import { useState } from "react";
 import { encodeScoreFile } from "@/lib/notation-format";
 import { GRIDS, NEW_TAB_LIMITS, TIME_SIGNATURES, TUNINGS, newTabTex } from "@/lib/new-tab";
 import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
+import type { Lang } from "@/i18n";
+import { editorText } from "./editor-i18n";
 
 /**
  * Chọn cách lên dây, capo, tempo, nhịp, số ô → dựng tab trống (Guitar Pro 7) để mở trình soạn.
@@ -13,7 +15,8 @@ export function NewTabForm({
   title = "",
   defaultBpm,
   note,
-  submitLabel = "Tạo và mở trình soạn",
+  submitLabel,
+  lang = "vi",
   onCreated,
   onCancel,
 }: {
@@ -22,9 +25,11 @@ export function NewTabForm({
   /** Dòng nhắc phía trên form */
   note?: React.ReactNode;
   submitLabel?: string;
+  lang?: Lang;
   onCreated: (notation: string, bpm: number) => void;
   onCancel?: () => void;
 }) {
+  const t = editorText[lang].newTab;
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -49,43 +54,43 @@ export function NewTabForm({
       onCreated(encodeScoreFile(bytes, 0), score.tempo || bpm);
     } catch (e) {
       console.error("Tạo tab mới:", e);
-      setError("Không tạo được tab mới. Thử lại nhé.");
+      setError(t.error);
     } finally {
       setCreating(false);
     }
   }
 
   return (
-    <form action={onCreate} className="flex flex-col gap-4 rounded-xl border border-line bg-bg p-4" aria-label="Tạo tab mới">
+    <form action={onCreate} className="flex flex-col gap-4 rounded-xl border border-line bg-bg p-4" aria-label={t.region}>
       {note && <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted">{note}</p>}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Cách lên dây" htmlFor="nt-tuning">
+        <Field label={t.tuning} htmlFor="nt-tuning">
           <select id="nt-tuning" name="tuning" defaultValue="standard" className={inputClass}>
-            {TUNINGS.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
+            {TUNINGS.map((tu) => (
+              <option key={tu.id} value={tu.id}>{t.tunings[tu.id] ?? tu.label}</option>
             ))}
           </select>
         </Field>
-        <Field label="Capo (ngăn)" htmlFor="nt-capo">
+        <Field label={t.capo} htmlFor="nt-capo">
           <input id="nt-capo" name="capo" type="number" min={NEW_TAB_LIMITS.capo[0]} max={NEW_TAB_LIMITS.capo[1]} defaultValue={0} className={inputClass} />
         </Field>
-        <Field label="Tempo (bpm)" htmlFor="nt-bpm">
+        <Field label={t.tempo} htmlFor="nt-bpm">
           <input id="nt-bpm" name="bpm" type="number" min={NEW_TAB_LIMITS.bpm[0]} max={NEW_TAB_LIMITS.bpm[1]} defaultValue={defaultBpm ?? 80} className={inputClass} />
         </Field>
-        <Field label="Nhịp" htmlFor="nt-ts">
+        <Field label={t.timeSignature} htmlFor="nt-ts">
           <select id="nt-ts" name="ts" defaultValue="4/4" className={inputClass}>
-            {TIME_SIGNATURES.map((t) => (
-              <option key={t.id} value={t.id}>{t.id}</option>
+            {TIME_SIGNATURES.map((ts) => (
+              <option key={ts.id} value={ts.id}>{ts.id}</option>
             ))}
           </select>
         </Field>
-        <Field label="Số ô nhịp" htmlFor="nt-bars" hint="Thêm / bớt ô được trong lúc soạn">
+        <Field label={t.bars} htmlFor="nt-bars" hint={t.barsHint}>
           <input id="nt-bars" name="bars" type="number" min={NEW_TAB_LIMITS.bars[0]} max={NEW_TAB_LIMITS.bars[1]} defaultValue={8} className={inputClass} />
         </Field>
-        <Field label="Ô trống chia theo" htmlFor="nt-grid" hint="Mỗi ô kẻ sẵn các dấu lặng để điền nốt">
+        <Field label={t.grid} htmlFor="nt-grid" hint={t.gridHint}>
           <select id="nt-grid" name="grid" defaultValue="8" className={inputClass}>
             {GRIDS.map((g) => (
-              <option key={g.value} value={g.value}>{g.label}</option>
+              <option key={g.value} value={g.value}>{t.grids[g.value] ?? g.label}</option>
             ))}
           </select>
         </Field>
@@ -93,11 +98,11 @@ export function NewTabForm({
       {error && <p role="alert" className="text-sm font-medium text-red-400">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" disabled={creating} className={buttonPrimary}>
-          {creating ? "Đang tạo…" : submitLabel}
+          {creating ? t.creating : (submitLabel ?? t.create)}
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} className={buttonSecondary}>
-            Huỷ
+            {t.cancel}
           </button>
         )}
       </div>

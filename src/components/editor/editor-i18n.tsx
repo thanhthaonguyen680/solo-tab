@@ -1,0 +1,313 @@
+/**
+ * Chữ trên trình soạn tab + form tạo tab trống, theo ngôn ngữ.
+ * Admin dùng tiếng Việt; trang đóng góp tiếng Anh (/en/contribute) dùng tiếng Anh.
+ */
+import type { Lang } from "@/i18n";
+
+const K = ({ children }: { children: React.ReactNode }) => <b className="text-soft">{children}</b>;
+
+const vi = {
+  durationName: { 1: "tròn", 2: "trắng", 4: "đen", 8: "móc đơn", 16: "móc kép", 32: "móc ba" } as Record<number, string>,
+  durationShort: { 1: "Tròn", 2: "Trắng", 4: "Đen", 8: "Đơn", 16: "Kép", 32: "Ba" } as Record<number, string>,
+  saveTab: "Lưu tab",
+  readyNew: (save: string) =>
+    `Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “${save}”.`,
+  // dòng thông tin con trỏ
+  dotted: " chấm",
+  deadNote: "X (đập/chặn dây)",
+  fret: (n: number) => `phím ${n}`,
+  slideTag: " · luyến",
+  letRingTag: " · ngân",
+  emptySpot: (isRest: boolean) => `${isRest ? "dấu lặng" : "dây trống"} → gõ số để thêm nốt`,
+  short: "thiếu",
+  over: "thừa",
+  picked: (a: number, b: number) => `[Chọn ô ${a}–${b}] `,
+  info: (bar: number, state: string, beat: number, string: number, what: string, dur: string) =>
+    `Ô ${bar}${state} · beat ${beat} · dây ${string} · ${what} · ${dur}`,
+  beats: (n: string) => `${n} phách`,
+  thirtySeconds: (n: number) => `${n} móc ba`,
+  // thông báo
+  loadError: "Không nạp được tab để sửa.",
+  loading: "Đang nạp tab…",
+  insertedBeat: "Đã chèn beat trống. Chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím để đặt nốt.",
+  cantSplit: "Nốt này đã ngắn nhất (móc ba), không chia được nữa.",
+  split: (name: string) => `Đã chia đôi thành 2 ${name}. Beat sau đang trống: chọn dây rồi gõ số phím để chèn nốt.`,
+  barAdded: (n: number) => `Đã thêm ô ${n}.`,
+  confirmDeleteBar: (n: number) => `Xoá ô ${n} cùng các nốt trong ô?`,
+  bars: (a: number, b: number) => (b > a ? `ô ${a}–${b}` : `ô ${a}`),
+  copied: (what: string) =>
+    `Đã chép ${what}. Bấm vào ô cần dán rồi chọn “Dán đè” (⌘/Ctrl + V) để thay nốt trong ô đó, hoặc “Dán chèn” (Shift + ⌘/Ctrl + V) để thêm thành ô mới phía sau.`,
+  pasted: (insert: boolean, where: string) => `Đã ${insert ? "chèn" : "dán đè"} vào ${where}. Dán nhầm thì bấm Hoàn tác (⌘/Ctrl + Z).`,
+  filled: (bar: number, n: number, atStart: boolean) => `Đã bù ô ${bar} bằng ${n} dấu lặng ở ${atStart ? "đầu" : "cuối"} ô.`,
+  cantMove: (s: number, tooLow: boolean) =>
+    `Không chuyển được: dây ${s} ${tooLow ? "không xuống thấp vậy được" : "đã có nốt hoặc phím quá cao"}.`,
+  trimmed: "Ô vừa sửa thừa phách → đã bớt dấu lặng ở cuối ô cho vừa đủ.",
+  pushed: (bar: number, added: boolean) =>
+    `Ô ${bar} thừa phách → đã dồn nốt cuối ô sang đầu ô ${bar + 1}${added ? " (thêm ô mới)" : ""}, như Guitar Pro.`,
+  noSong: "Chưa chọn bài để lưu",
+  saved: "✓ Đã lưu tab. Trang bài trên site đã cập nhật.",
+  confirmDiscard: "Bỏ các thay đổi chưa lưu?",
+  // thanh công cụ
+  region: "Sửa tab",
+  play: "Nghe thử",
+  pause: "Tạm dừng",
+  undo: "Hoàn tác",
+  redo: "Làm lại",
+  tempoGroup: "Tempo nghe thử",
+  slower: "Giảm tempo",
+  faster: "Tăng tempo",
+  tempoReset: (bpm: number) => `Tempo nghe thử — bấm để về ${bpm} bpm`,
+  close: "Đóng",
+  saving: "Đang lưu…",
+  savedShort: "Đã lưu",
+  toolbar: "Công cụ sửa nốt",
+  gInsert: "Chèn nốt",
+  splitChip: "Chia đôi",
+  splitTitle: "Chia nốt đang chọn thành 2 nốt ngắn bằng nửa — ô không bị thừa phách (phím D)",
+  before: "+ Trước",
+  beforeTitle: "Chèn beat trống cùng trường độ phía trước (Shift + I)",
+  after: "+ Sau",
+  afterTitle: "Chèn beat trống cùng trường độ phía sau (phím I)",
+  gFret: "Phím",
+  fretAria: "Số phím cho dây đang chọn — Enter để đặt",
+  fretTitle: "Gõ số phím rồi Enter: đặt nốt vào dây đang chọn (dây trống thì thêm nốt → thành nốt đôi / hợp âm)",
+  deleteNote: "Xoá nốt",
+  deleteNoteTitle: "Xoá nốt đang chọn (Delete)",
+  deleteBeat: "Xoá beat",
+  deleteBeatTitle: "Xoá cả beat (Shift + Delete)",
+  gDuration: "Trường độ",
+  durationTitle: (name: string) => `Nốt ${name} (+ / − để đổi nhanh)`,
+  dot: "Chấm",
+  dotTitle: "Chấm dôi (phím .)",
+  gBars: "Ô nhịp",
+  addBar: "+ Ô sau",
+  addBarTitle: "Thêm một ô trống ngay sau ô đang chọn",
+  deleteBar: "Xoá ô",
+  deleteBarTitle: "Xoá ô đang chọn",
+  copy: (n: number) => (n > 1 ? `Chép ${n} ô` : "Chép ô"),
+  copyTitle: "Chép ô đang chọn (⌘/Ctrl + C). Chép nhiều ô: giữ Shift rồi bấm sang ô khác, hoặc Shift + ← →",
+  pasteOver: (n: number) => `Dán đè${n > 1 ? ` ${n} ô` : ""}`,
+  pasteOverTitle: "Dán đè các ô đã chép lên ô đang chọn trở đi (⌘/Ctrl + V)",
+  pasteInsert: "Dán chèn",
+  pasteInsertTitle: "Chèn các ô đã chép thành ô mới ngay sau ô đang chọn (Shift + ⌘/Ctrl + V)",
+  gTechnique: "Kỹ thuật",
+  deadTitle: "Bật/tắt tiếng đập “xx” (phím X)",
+  slide: "Luyến",
+  slideTitle: "Luyến sang nốt sau (phím S)",
+  letRing: "Ngân",
+  letRingTitle: "Ngân (phím L)",
+  // cảnh báo phách
+  warnLead: (
+    <>
+      <b>⚠ Có ô chưa đúng số phách.</b> Khi phát, mỗi ô luôn chiếm đủ số phách của nhịp: ô <b>thiếu</b> sẽ có khoảng lặng ở cuối ô,
+      ô <b>thừa</b> thì nốt cuối vang chồng lên đầu ô sau (nghe như bị mất nốt). Đổi trường độ cho khớp, hoặc:
+    </>
+  ),
+  bar: (n: number) => `Ô ${n}`,
+  fillStart: "Bù lặng đầu ô",
+  fillStartTitle: "Thêm dấu lặng ở đầu ô — các nốt dồn về cuối và nối liền sang ô sau (hợp với ô mở đầu / lấy đà)",
+  fillEnd: "Bù lặng cuối ô",
+  fillEndTitle: "Thêm dấu lặng ở cuối ô",
+  pushNext: "Dồn sang ô sau",
+  pushNextTitle: "Bớt dấu lặng cuối ô, còn thừa thì đẩy các nốt quá vạch nhịp sang đầu ô sau (như Guitar Pro)",
+  // hướng dẫn
+  helpTitle: "Cách dùng & phím tắt",
+  helpLead: (
+    <>
+      <b>Chèn nốt:</b> chọn nốt → <b>Chia đôi</b> → beat mới trống hiện ra ngay sau → bấm vào dây muốn đặt → gõ số phím.{" "}
+      <b>Nốt đôi / hợp âm:</b> bấm vào dây trống ngay trên/dưới nốt có sẵn → gõ số phím.
+    </>
+  ),
+  help: [
+    <><K>Bấm vào nốt</K>: chọn nốt · <K>bấm vào dây trống</K>: chọn dây đó</>,
+    <><K>← →</K>: beat trước / sau (ô chưa đủ phách thì → tạo thêm chỗ trống trong ô, như Guitar Pro) · <K>↑ ↓</K>: đổi dây</>,
+    <><K>0–9</K>: đặt phím (gõ liền 2 số cho 10–24); dây trống thì thêm nốt → nốt đôi / hợp âm</>,
+    <><K>D</K>: chia đôi nốt để chèn thêm nốt mà ô không thừa phách</>,
+    <><K>I</K> / <K>Shift + I</K>: chèn beat trống sau / trước</>,
+    <><K>Shift + ↑ ↓</K>: chuyển nốt sang dây bên cạnh, giữ cao độ</>,
+    <><K>Delete</K>: xoá nốt · <K>Shift + Delete</K>: xoá cả beat</>,
+    <><K>+ / −</K>: dài hơn / ngắn hơn · <K>.</K>: chấm dôi (ô bị thừa phách thì tự bớt dấu lặng cuối ô hoặc dồn nốt sang ô sau)</>,
+    <><K>X</K>: bật/tắt tiếng đập “xx” · <K>S</K>: luyến · <K>L</K>: ngân</>,
+    <>
+      <K>⌘/Ctrl + C</K>: chép ô · <K>⌘/Ctrl + V</K>: dán đè · <K>Shift + ⌘/Ctrl + V</K>: dán chèn · chọn nhiều ô: <K>Shift + bấm</K> hoặc{" "}
+      <K>Shift + ← →</K>
+    </>,
+    <><K>Space</K>: nghe thử · <K>Ctrl/⌘ + Z</K>: hoàn tác</>,
+  ],
+  canvas: "Vùng sửa tab — bấm vào nốt rồi dùng bàn phím",
+  // form tạo tab trống
+  newTab: {
+    region: "Tạo tab mới",
+    tuning: "Cách lên dây",
+    capo: "Capo (ngăn)",
+    tempo: "Tempo (bpm)",
+    timeSignature: "Nhịp",
+    bars: "Số ô nhịp",
+    barsHint: "Thêm / bớt ô được trong lúc soạn",
+    grid: "Ô trống chia theo",
+    gridHint: "Mỗi ô kẻ sẵn các dấu lặng để điền nốt",
+    tunings: {
+      standard: "Chuẩn (E A D G B E)",
+      g5: "Hạ dây 5 xuống G (E G D G B E)",
+      dropd: "Drop D (D A D G B E)",
+      dadgad: "DADGAD",
+      openg: "Open G (D G D G B D)",
+    } as Record<string, string>,
+    grids: { 8: "Móc đơn", 16: "Móc kép", 4: "Nốt đen" } as Record<number, string>,
+    create: "Tạo và mở trình soạn",
+    creating: "Đang tạo…",
+    cancel: "Huỷ",
+    error: "Không tạo được tab mới. Thử lại nhé.",
+  },
+};
+
+export type EditorText = typeof vi;
+
+const en: EditorText = {
+  durationName: { 1: "whole", 2: "half", 4: "quarter", 8: "eighth", 16: "16th", 32: "32nd" },
+  durationShort: { 1: "Whole", 2: "Half", 4: "Quarter", 8: "8th", 16: "16th", 32: "32nd" },
+  saveTab: "Save tab",
+  readyNew: (save) =>
+    `Your blank tab is ready: click a rest, pick a string (click it or use ↑ ↓) and type a fret number. Click “${save}” when you're done.`,
+  dotted: " dotted",
+  deadNote: "X (dead note)",
+  fret: (n) => `fret ${n}`,
+  slideTag: " · slide",
+  letRingTag: " · let ring",
+  emptySpot: (isRest) => `${isRest ? "rest" : "empty string"} → type a number to add a note`,
+  short: "short",
+  over: "over",
+  picked: (a, b) => `[Bars ${a}–${b} selected] `,
+  info: (bar, state, beat, string, what, dur) => `Bar ${bar}${state} · beat ${beat} · string ${string} · ${what} · ${dur}`,
+  beats: (n) => `${n} ${n === "1" ? "beat" : "beats"}`,
+  thirtySeconds: (n) => `${n} × 32nd`,
+  loadError: "Couldn't load the tab for editing.",
+  loading: "Loading tab…",
+  insertedBeat: "Empty beat inserted. Pick a string (click it or use ↑ ↓) and type a fret number to place a note.",
+  cantSplit: "This note is already the shortest (32nd) and can't be split further.",
+  split: (name) => `Split into two ${name} notes. The second beat is empty: pick a string and type a fret number to add a note.`,
+  barAdded: (n) => `Added bar ${n}.`,
+  confirmDeleteBar: (n) => `Delete bar ${n} and the notes in it?`,
+  bars: (a, b) => (b > a ? `bars ${a}–${b}` : `bar ${a}`),
+  copied: (what) =>
+    `Copied ${what}. Click the bar to paste into, then choose “Paste over” (⌘/Ctrl + V) to replace its notes, or “Paste as new” (Shift + ⌘/Ctrl + V) to add them as new bars after it.`,
+  pasted: (insert, where) => `${insert ? "Inserted" : "Pasted"} into ${where}. Wrong spot? Press Undo (⌘/Ctrl + Z).`,
+  filled: (bar, n, atStart) => `Filled bar ${bar} with ${n} ${n === 1 ? "rest" : "rests"} at the ${atStart ? "start" : "end"}.`,
+  cantMove: (s, tooLow) => `Can't move: string ${s} ${tooLow ? "can't go that low" : "already has a note there, or the fret would be too high"}.`,
+  trimmed: "The bar you edited was too long → trimmed the rests at its end to fit.",
+  pushed: (bar, added) =>
+    `Bar ${bar} was too long → moved its last notes to the start of bar ${bar + 1}${added ? " (new bar added)" : ""}, like Guitar Pro.`,
+  noSong: "No song selected to save to",
+  saved: "✓ Tab saved. The song page has been updated.",
+  confirmDiscard: "Discard your unsaved changes?",
+  region: "Tab editor",
+  play: "Play",
+  pause: "Pause",
+  undo: "Undo",
+  redo: "Redo",
+  tempoGroup: "Playback tempo",
+  slower: "Slower",
+  faster: "Faster",
+  tempoReset: (bpm) => `Playback tempo — click to reset to ${bpm} bpm`,
+  close: "Close",
+  saving: "Saving…",
+  savedShort: "Saved",
+  toolbar: "Note tools",
+  gInsert: "Insert",
+  splitChip: "Split",
+  splitTitle: "Split the selected note into two notes of half the length — the bar stays the same length (D)",
+  before: "+ Before",
+  beforeTitle: "Insert an empty beat of the same length before (Shift + I)",
+  after: "+ After",
+  afterTitle: "Insert an empty beat of the same length after (I)",
+  gFret: "Fret",
+  fretAria: "Fret number for the selected string — press Enter to place",
+  fretTitle: "Type a fret number and press Enter to place a note on the selected string (on an empty string it adds a note → double stop / chord)",
+  deleteNote: "Delete note",
+  deleteNoteTitle: "Delete the selected note (Delete)",
+  deleteBeat: "Delete beat",
+  deleteBeatTitle: "Delete the whole beat (Shift + Delete)",
+  gDuration: "Duration",
+  durationTitle: (name) => `${name[0].toUpperCase()}${name.slice(1)} note (+ / − to change quickly)`,
+  dot: "Dot",
+  dotTitle: "Dotted note (.)",
+  gBars: "Bars",
+  addBar: "+ Bar after",
+  addBarTitle: "Add an empty bar right after the selected one",
+  deleteBar: "Delete bar",
+  deleteBarTitle: "Delete the selected bar",
+  copy: (n) => (n > 1 ? `Copy ${n} bars` : "Copy bar"),
+  copyTitle: "Copy the selected bar (⌘/Ctrl + C). To copy several bars, hold Shift and click another bar, or use Shift + ← →",
+  pasteOver: (n) => `Paste over${n > 1 ? ` ${n} bars` : ""}`,
+  pasteOverTitle: "Paste the copied bars over the selected bar onwards (⌘/Ctrl + V)",
+  pasteInsert: "Paste as new",
+  pasteInsertTitle: "Insert the copied bars as new bars right after the selected one (Shift + ⌘/Ctrl + V)",
+  gTechnique: "Technique",
+  deadTitle: "Toggle dead note “xx” (X)",
+  slide: "Slide",
+  slideTitle: "Slide into the next note (S)",
+  letRing: "Let ring",
+  letRingTitle: "Let ring (L)",
+  warnLead: (
+    <>
+      <b>⚠ Some bars have the wrong number of beats.</b> On playback every bar takes its full length: a <b>short</b> bar ends with a gap,
+      and in a bar that runs <b>over</b> the last note spills into the next bar (it sounds like a missing note). Fix the durations, or:
+    </>
+  ),
+  bar: (n) => `Bar ${n}`,
+  fillStart: "Fill rests at start",
+  fillStartTitle: "Add rests at the start of the bar — the notes move to the end and lead into the next bar (good for a pickup bar)",
+  fillEnd: "Fill rests at end",
+  fillEndTitle: "Add rests at the end of the bar",
+  pushNext: "Move into next bar",
+  pushNextTitle: "Trim the rests at the end of the bar, then move any notes past the bar line to the start of the next bar (like Guitar Pro)",
+  helpTitle: "How to use & shortcuts",
+  helpLead: (
+    <>
+      <b>Add a note:</b> select a note → <b>Split</b> → a new empty beat appears right after it → click the string you want → type the fret number.{" "}
+      <b>Double stops / chords:</b> click the empty string just above or below an existing note → type the fret number.
+    </>
+  ),
+  help: [
+    <><K>Click a note</K>: select it · <K>click an empty string</K>: select that string</>,
+    <><K>← →</K>: previous / next beat (in a bar that’s short, → makes room for another note, like Guitar Pro) · <K>↑ ↓</K>: change string</>,
+    <><K>0–9</K>: set the fret (type two digits quickly for 10–24); on an empty string it adds a note → double stop / chord</>,
+    <><K>D</K>: split a note to fit in another without making the bar too long</>,
+    <><K>I</K> / <K>Shift + I</K>: insert an empty beat after / before</>,
+    <><K>Shift + ↑ ↓</K>: move the note to the next string, keeping its pitch</>,
+    <><K>Delete</K>: delete the note · <K>Shift + Delete</K>: delete the whole beat</>,
+    <><K>+ / −</K>: longer / shorter · <K>.</K>: dotted (if the bar gets too long, rests at the end are trimmed or notes move to the next bar)</>,
+    <><K>X</K>: toggle dead note “xx” · <K>S</K>: slide · <K>L</K>: let ring</>,
+    <>
+      <K>⌘/Ctrl + C</K>: copy bars · <K>⌘/Ctrl + V</K>: paste over · <K>Shift + ⌘/Ctrl + V</K>: paste as new · select several bars:{" "}
+      <K>Shift + click</K> or <K>Shift + ← →</K>
+    </>,
+    <><K>Space</K>: play · <K>Ctrl/⌘ + Z</K>: undo</>,
+  ],
+  canvas: "Tab editing area — click a note, then use the keyboard",
+  newTab: {
+    region: "New tab",
+    tuning: "Tuning",
+    capo: "Capo (fret)",
+    tempo: "Tempo (bpm)",
+    timeSignature: "Time signature",
+    bars: "Number of bars",
+    barsHint: "You can add or remove bars while composing",
+    grid: "Fill empty bars with",
+    gridHint: "Each bar starts with rests you can turn into notes",
+    tunings: {
+      standard: "Standard (E A D G B E)",
+      g5: "5th string down to G (E G D G B E)",
+      dropd: "Drop D (D A D G B E)",
+      dadgad: "DADGAD",
+      openg: "Open G (D G D G B D)",
+    },
+    grids: { 8: "Eighth notes", 16: "16th notes", 4: "Quarter notes" },
+    create: "Create and open the editor",
+    creating: "Creating…",
+    cancel: "Cancel",
+    error: "Couldn't create a new tab. Please try again.",
+  },
+};
+
+export const editorText: Record<Lang, EditorText> = { vi, en };
