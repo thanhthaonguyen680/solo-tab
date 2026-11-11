@@ -17,6 +17,7 @@ export function NewTabForm({
   note,
   submitLabel,
   lang = "vi",
+  contribute = false,
   onCreated,
   onCancel,
 }: {
@@ -26,7 +27,9 @@ export function NewTabForm({
   note?: React.ReactNode;
   submitLabel?: string;
   lang?: Lang;
-  onCreated: (notation: string, bpm: number) => void;
+  /** Trang đóng góp: hỏi tên bài + tác giả (hiện trên khung nhạc), bắt đầu với 1 ô — soạn tới đâu thêm ô tới đó */
+  contribute?: boolean;
+  onCreated: (notation: string, bpm: number, song: { title: string; artist: string }) => void;
   onCancel?: () => void;
 }) {
   const t = editorText[lang].newTab;
@@ -39,19 +42,23 @@ export function NewTabForm({
     try {
       const alphaTab = await import("@coderline/alphatab");
       const bpm = Number(form.get("bpm"));
+      const song = contribute
+        ? { title: String(form.get("songTitle") ?? "").trim(), artist: String(form.get("songArtist") ?? "").trim() }
+        : { title, artist: "" };
       const tex = newTabTex({
-        title,
+        title: song.title,
+        artist: song.artist,
         tuning: String(form.get("tuning")),
         capo: Number(form.get("capo")),
         bpm,
         timeSignature: String(form.get("ts")),
-        bars: Number(form.get("bars")),
+        bars: contribute ? 1 : Number(form.get("bars")),
         grid: Number(form.get("grid")),
       });
       const settings = new alphaTab.Settings();
       const score = alphaTab.importer.ScoreLoader.loadAlphaTex(tex, settings);
       const bytes = new alphaTab.exporter.Gp7Exporter().export(score, settings);
-      onCreated(encodeScoreFile(bytes, 0), score.tempo || bpm);
+      onCreated(encodeScoreFile(bytes, 0), score.tempo || bpm, song);
     } catch (e) {
       console.error("Tạo tab mới:", e);
       setError(t.error);
@@ -63,6 +70,16 @@ export function NewTabForm({
   return (
     <form action={onCreate} className="flex flex-col gap-4 rounded-xl border border-line bg-bg p-4" aria-label={t.region}>
       {note && <p className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted">{note}</p>}
+      {contribute && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t.songTitle} htmlFor="nt-song-title">
+            <input id="nt-song-title" name="songTitle" required maxLength={200} className={inputClass} />
+          </Field>
+          <Field label={t.songArtist} htmlFor="nt-song-artist">
+            <input id="nt-song-artist" name="songArtist" maxLength={200} className={inputClass} />
+          </Field>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label={t.tuning} htmlFor="nt-tuning">
           <select id="nt-tuning" name="tuning" defaultValue="standard" className={inputClass}>
@@ -84,9 +101,11 @@ export function NewTabForm({
             ))}
           </select>
         </Field>
-        <Field label={t.bars} htmlFor="nt-bars" hint={t.barsHint}>
-          <input id="nt-bars" name="bars" type="number" min={NEW_TAB_LIMITS.bars[0]} max={NEW_TAB_LIMITS.bars[1]} defaultValue={8} className={inputClass} />
-        </Field>
+        {!contribute && (
+          <Field label={t.bars} htmlFor="nt-bars" hint={t.barsHint}>
+            <input id="nt-bars" name="bars" type="number" min={NEW_TAB_LIMITS.bars[0]} max={NEW_TAB_LIMITS.bars[1]} defaultValue={8} className={inputClass} />
+          </Field>
+        )}
         <Field label={t.grid} htmlFor="nt-grid" hint={t.gridHint}>
           <select id="nt-grid" name="grid" defaultValue="8" className={inputClass}>
             {GRIDS.map((g) => (

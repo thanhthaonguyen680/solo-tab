@@ -12,6 +12,7 @@ const vi = {
   saveTab: "Lưu tab",
   readyNew: (save: string) =>
     `Tab trống đã sẵn sàng: bấm vào một dấu lặng, chọn dây (bấm vào dây hoặc ↑ ↓) rồi gõ số phím. Xong bấm “${save}”.`,
+  growHint: " Soạn tới ô cuối thì ô mới tự thêm vào.",
   // dòng thông tin con trỏ
   dotted: " chấm",
   deadNote: "X (đập/chặn dây)",
@@ -138,6 +139,8 @@ const vi = {
   // form tạo tab trống
   newTab: {
     region: "Tạo tab mới",
+    songTitle: "Tên bài *",
+    songArtist: "Ca sĩ / tác giả bài hát",
     tuning: "Cách lên dây",
     capo: "Capo (ngăn)",
     tempo: "Tempo (bpm)",
@@ -169,6 +172,7 @@ const en: EditorText = {
   saveTab: "Save tab",
   readyNew: (save) =>
     `Your blank tab is ready: click a rest, pick a string (click it or use ↑ ↓) and type a fret number. Click “${save}” when you're done.`,
+  growHint: " A new bar is added automatically when you reach the last one.",
   dotted: " dotted",
   deadNote: "X (dead note)",
   fret: (n) => `fret ${n}`,
@@ -287,6 +291,8 @@ const en: EditorText = {
   canvas: "Tab editing area — click a note, then use the keyboard",
   newTab: {
     region: "New tab",
+    songTitle: "Song title *",
+    songArtist: "Artist / songwriter",
     tuning: "Tuning",
     capo: "Capo (fret)",
     tempo: "Tempo (bpm)",

@@ -16,10 +16,11 @@ const TabEditor = dynamic(() => import("@/components/editor/TabEditor").then((m)
   loading: () => <p className="text-sm text-muted">{contributeText[langOf(location.pathname)].compose.opening}</p>,
 });
 
+type Song = { title: string; artist: string };
 type Step =
   | { kind: "setup" }
-  | { kind: "edit"; notation: string; bpm: number; isNew: boolean }
-  | { kind: "send"; notation: string; bpm: number };
+  | { kind: "edit"; notation: string; bpm: number; song: Song; isNew: boolean }
+  | { kind: "send"; notation: string; bpm: number; song: Song };
 
 /** Soạn tab từ đầu ngay trên trình duyệt: chọn khung tab → soạn với thanh công cụ → điền thông tin → gửi duyệt */
 export function ComposeTab({ lang }: { lang: Lang }) {
@@ -44,9 +45,10 @@ export function ComposeTab({ lang }: { lang: Lang }) {
         <NewTabForm
           submitLabel={t.compose.open}
           lang={lang}
-          onCreated={(notation, bpm) => {
+          contribute
+          onCreated={(notation, bpm, song) => {
             setNotice(undefined);
-            setStep({ kind: "edit", notation, bpm, isNew: true });
+            setStep({ kind: "edit", notation, bpm, song, isNew: true });
           }}
         />
       )}
@@ -54,11 +56,14 @@ export function ComposeTab({ lang }: { lang: Lang }) {
       {step.kind === "edit" && (
         <TabEditor
           notation={step.notation}
+          title={step.song.title}
+          artist={step.song.artist}
           isNew={step.isNew}
+          grow
           saveLabel={t.compose.done}
           lang={lang}
           onSave={async (notation) => {
-            setStep({ kind: "send", notation, bpm: step.bpm });
+            setStep({ kind: "send", notation, bpm: step.bpm, song: step.song });
             return { ok: true };
           }}
           onClose={() => setStep({ kind: "setup" })}
@@ -71,7 +76,7 @@ export function ComposeTab({ lang }: { lang: Lang }) {
             <p className="text-sm text-accent-ink">{t.compose.finished}</p>
             <button
               type="button"
-              onClick={() => setStep({ kind: "edit", notation: step.notation, bpm: step.bpm, isNew: false })}
+              onClick={() => setStep({ kind: "edit", notation: step.notation, bpm: step.bpm, song: step.song, isNew: false })}
               className={buttonSecondary}
             >
               {t.compose.editMore}
@@ -81,6 +86,8 @@ export function ComposeTab({ lang }: { lang: Lang }) {
           <ContributionForm
             notation={step.notation}
             tempo={step.bpm}
+            defaultTitle={step.song.title}
+            defaultArtist={step.song.artist}
             cancelLabel={t.compose.discard}
             lang={lang}
             onCancel={() => {

@@ -24,6 +24,7 @@ export const GRIDS = [
 
 export type NewTabOptions = {
   title: string;
+  artist?: string;
   tuning: string; // id trong TUNINGS
   capo: number;
   bpm: number;
@@ -50,9 +51,11 @@ export function newTabTex(o: NewTabOptions): string {
   const capo = clamp(o.capo, NEW_TAB_LIMITS.capo);
   const bars = clamp(o.bars, NEW_TAB_LIMITS.bars);
   const title = o.title.replace(/["\\]/g, "'").trim();
+  const artist = (o.artist ?? "").replace(/["\\]/g, "'").trim();
   const bar = Array.from({ length: restsPerBar(ts.num, ts.den, step) }, () => `r.${step}`).join(" ");
   return [
     title ? `\\title "${title}"` : "",
+    artist ? `\\artist "${artist}"` : "",
     `\\tempo ${clamp(o.bpm, NEW_TAB_LIMITS.bpm)}`,
     ".",
     `\\track "Guitar"`,

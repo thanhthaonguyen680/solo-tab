@@ -33,6 +33,7 @@ export function TabEditor({
   onSave: saveHandler,
   saveLabel,
   lang = "vi",
+  grow = false,
   onClose,
 }: {
   /** Bài trong database — bấm "Lưu tab" thì lưu thẳng vào bài này (admin) */
@@ -48,6 +49,8 @@ export function TabEditor({
   onSave?: (notation: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   saveLabel?: string;
   lang?: Lang;
+  /** Soạn tới đâu thêm ô tới đó: điền nốt vào ô cuối → tự thêm ô trống phía sau; khi lưu bỏ các ô trống ở cuối */
+  grow?: boolean;
   onClose: () => void;
 }) {
   const t = editorText[lang];
@@ -68,7 +71,7 @@ export function TabEditor({
   const [dirty, setDirty] = useState(isNew);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | undefined>(
-    isNew ? t.readyNew(saveLabel) : undefined,
+    isNew ? t.readyNew(saveLabel) + (grow ? t.growHint : "") : undefined,
   );
   const [error, setError] = useState<string>();
   /** Ô lệch phách: diff > 0 là thừa, < 0 là thiếu (đơn vị tick, 960 = 1 phách đen) */
@@ -358,7 +361,10 @@ export function TabEditor({
     const x = context();
     if (!x?.beat || fret < 0 || fret > 24) return;
     const { lib, c, beat } = x;
+    const score = apiRef.current?.score;
     commit(() => {
+      // soạn tới ô cuối → thêm sẵn ô trống phía sau để soạn tiếp
+      if (grow && score && c.bar === score.masterBars.length - 1) addBar(lib, score, c.bar + 1, score.masterBars[c.bar]);
       const n = noteAt(c);
       if (n) { n.fret = fret; n.isDead = false; return; }
       const created = new lib.model.Note();
@@ -691,7 +697,12 @@ export function TabEditor({
     if (!api?.score || !lib) return;
     setSaving(true);
     setError(undefined);
-    const bytes = new lib.exporter.Gp7Exporter().export(api.score, null);
+    let bytes = new lib.exporter.Gp7Exporter().export(api.score, null);
+    if (grow) {
+      // bỏ các ô trống thừa ở cuối (trên bản sao — tab đang soạn giữ nguyên)
+      const copy = lib.importer.ScoreLoader.loadScoreFromBytes(bytes);
+      if (trimTrailingEmptyBars(copy)) bytes = new lib.exporter.Gp7Exporter().export(copy, null);
+    }
     const encoded = encodeScoreFile(bytes, trackRef.current);
     const result = saveHandler
       ? await saveHandler(encoded)
@@ -977,6 +988,20 @@ function renumber(score: model.Score) {
           }
         }
       }
+}
+
+/** Bỏ các ô không có nốt nào ở cuối bài (giữ ít nhất một ô). Trả về true nếu có bỏ ô. */
+function trimTrailingEmptyBars(score: model.Score) {
+  const empty = (i: number) =>
+    score.tracks.every((tr) => tr.staves.every((s) => s.bars[i]?.voices.every((v) => v.beats.every((b) => !b.notes.length)) ?? true));
+  let n = score.masterBars.length;
+  while (n > 1 && empty(n - 1)) n--;
+  if (n === score.masterBars.length) return false;
+  score.masterBars.splice(n);
+  for (const tr of score.tracks) for (const s of tr.staves) s.bars.splice(n);
+  relinkBars(score);
+  renumber(score);
+  return true;
 }
 
 /** Đánh lại chỉ số / liên kết ô sau khi thêm hoặc xoá ô (để xuất file đúng thứ tự) */
