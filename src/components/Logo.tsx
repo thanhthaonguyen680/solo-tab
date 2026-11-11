@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { site } from "@/config/site";
 import { dict, paths, type Lang } from "@/i18n";
 
 export function Logo({ lang = "vi" }: { lang?: Lang }) {
   return (
-    <Link href={paths.home(lang)} className="group flex shrink-0 items-center gap-1.5 sm:gap-2" aria-label={`solo.tab — ${dict[lang].nav.home}`}>
+    <Link href={paths.home(lang)} className="group flex shrink-0 items-center gap-1.5 sm:gap-2" aria-label={`${site.name} — ${dict[lang].nav.home}`}>
       <svg viewBox="0 0 24 24" className="size-7 transition-transform group-hover:-rotate-12" aria-hidden>
         {/* Miếng gảy đàn */}
         <path
@@ -13,7 +14,7 @@ export function Logo({ lang = "vi" }: { lang?: Lang }) {
         <path stroke="var(--accent-fg)" strokeWidth="1.4" strokeLinecap="round" d="M8.5 8h7M8.5 10.5h7M8.5 13h7" />
       </svg>
       <span className="font-display text-lg font-semibold tracking-tight sm:text-xl">
-        solo<span className="text-accent-ink">.tab</span>
+        Solo<span className="text-accent-ink">Tab</span>
       </span>
     </Link>
   );

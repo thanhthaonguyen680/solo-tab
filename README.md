@@ -1,4 +1,4 @@
-# solo.tab
+# SoloTab
 
 🌐 **Website:** https://solotab.site
 
@@ -46,4 +46,4 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 
 ---
 
-© 2026 solo.tab · A product by **Thao.Nguyen**
+© 2026 SoloTab · A product by **Thao.Nguyen**

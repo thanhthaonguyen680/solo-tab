@@ -1,5 +1,5 @@
 export const site = {
-  name: "solo.tab",
+  name: "SoloTab",
   tagline: "Kho tab guitar solo & melody",
   description:
     "Tab guitar solo và melody, có audio mẫu, cập nhật mỗi tuần.",
