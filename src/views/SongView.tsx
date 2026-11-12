@@ -89,7 +89,7 @@ export async function SongView({ lang, slug }: { lang: Lang; slug: string }) {
         <section className="flex flex-col gap-4">
           {/* Có dữ liệu nốt → tab tương tác tự phát nhạc, thay cho file audio */}
           {notation ? (
-            <TabPlayer notation={notation} defaultBpm={song.bpm} title={song.title} artist={song.artist} lang={lang} />
+            <TabPlayer notation={notation} defaultBpm={song.bpm} title={song.title} artist={song.artist} contributor={song.authorName} lang={lang} />
           ) : (
             song.audioUrl && (
               <div className="rounded-xl border border-accent/40 bg-fresh p-4">

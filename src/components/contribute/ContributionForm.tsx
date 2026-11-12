@@ -62,7 +62,7 @@ export function ContributionForm({
         <input id={id("artist")} name="artist" maxLength={200} defaultValue={defaultArtist} className={inputClass} />
       </Field>
       <Field label={t.name} id={id("name")} hint={t.nameHint}>
-        <input id={id("name")} name="name" maxLength={60} autoComplete="nickname" className={inputClass} />
+        <input id={id("name")} name="name" maxLength={60} autoComplete="nickname" placeholder={t.namePlaceholder} className={inputClass} />
       </Field>
       <Field label={t.collection} id={id("collection")}>
         <select id={id("collection")} name="collection" defaultValue="melody" className={inputClass}>

@@ -1,6 +1,6 @@
 "use client";
 
-import type { AlphaTabApi } from "@coderline/alphatab";
+import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useEffect, useRef, useState } from "react";
 import { dict, type Lang } from "@/i18n";
 import { applySongInfo, decodeNotation } from "@/lib/notation-format";
@@ -24,6 +24,7 @@ export function TabPlayer({
   defaultBpm,
   title,
   artist,
+  contributor,
   lang = "vi",
 }: {
   notation: string;
@@ -31,6 +32,8 @@ export function TabPlayer({
   /** Tên bài / ca sĩ trong admin — hiện ở đầu bản nhạc thay cho tên ghi sẵn trong file nốt */
   title?: string;
   artist?: string;
+  /** Người đóng góp tab — hiện ở góc phải đầu bản nhạc */
+  contributor?: string;
   lang?: Lang;
 }) {
   const t = dict[lang].player;
@@ -124,6 +127,7 @@ export function TabPlayer({
 
       api.scoreLoaded.on((score) => {
         applySongInfo(score, title, artist); // chạy trước khi alphaTab vẽ
+        if (contributor?.trim()) showContributor(alphaTab, score, contributor.trim(), t.contributedBy);
         const start = defaultBpm ?? score.tempo;
         const current = prefsRef.current.bpm ?? start;
         setBaseBpm(score.tempo);
@@ -175,7 +179,7 @@ export function TabPlayer({
         silentAudioRef.current = null;
       }
     };
-  }, [notation, defaultBpm, layoutChoice, t, title, artist]);
+  }, [notation, defaultBpm, layoutChoice, t, title, artist, contributor]);
 
   function togglePlay() {
     const api = apiRef.current;
@@ -329,6 +333,16 @@ export function TabPlayer({
       </div>
       <p className="text-xs text-muted">{t.hint}</p>
     </section>
+  );
+}
+
+/** Bật dòng "người soạn tab" của alphaTab (mặc định ẩn) và ghi tên người đóng góp vào đó */
+function showContributor(alphaTab: typeof import("@coderline/alphatab"), score: model.Score, name: string, label: string) {
+  score.tab = name;
+  const style = (score.style ??= new alphaTab.model.ScoreStyle());
+  style.headerAndFooter.set(
+    alphaTab.model.ScoreSubElement.Transcriber,
+    new alphaTab.model.HeaderFooterStyle(`${label} %TABBER%`, true, alphaTab.platform.TextAlign.Right),
   );
 }
 

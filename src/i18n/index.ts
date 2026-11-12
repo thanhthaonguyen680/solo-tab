@@ -88,6 +88,8 @@ const vi = {
     countIn: "Đếm vào",
     horizontal: "Cuộn ngang",
     hint: "Bấm vào một nốt bất kỳ để phát từ chỗ đó.",
+    /** Dòng tên người đóng góp ở góc bản nhạc */
+    contributedBy: "Người đóng góp:",
   },
   author: {
     eyebrow: "Người soạn tab",
@@ -179,6 +181,7 @@ const en: Dict = {
     countIn: "Count-in",
     horizontal: "Scroll sideways",
     hint: "Click any note to play from there.",
+    contributedBy: "Contributed by",
   },
   author: {
     eyebrow: "Tab author",
