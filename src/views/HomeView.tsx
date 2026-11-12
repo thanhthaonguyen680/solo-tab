@@ -28,13 +28,9 @@ export async function HomeView({ lang }: { lang: Lang }) {
             <Link href={solo} className={buttonPrimary("lg")}>
               {t.home.browse}
             </Link>
-            {site.membership ? (
+            {site.membership && (
               <Link href="/goi" className={buttonSecondary("lg")}>
                 {t.home.perMonth(site.pricePerMonth)}
-              </Link>
-            ) : (
-              <Link href={paths.collection(lang, "melody")} className={buttonSecondary("lg")}>
-                {t.home.melody}
               </Link>
             )}
           </div>
