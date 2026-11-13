@@ -50,7 +50,7 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
       if (b.chord) fx.push(`ch "${esc(b.chord)}"`);
       if (b.arpeggio) fx.push("au");
       let body = "r";
-      if (!b.rest) {
+      if (!b.rest && b.notes.length) {
         const notes = b.notes.map((n) => {
           const nfx: string[] = [];
           if (letRing && !n.dead) nfx.push("lr");
