@@ -7,6 +7,7 @@ import { encodeScoreFile, isScoreFile, SCORE_FILE_EXTENSIONS } from "@/lib/notat
 import type { Lang } from "@/i18n";
 import { readPdfTab, readScoreFile, type ScoreFile } from "@/lib/score-reader";
 import { contributeText } from "./contribute-i18n";
+import { type Published, PublishedNotice } from "./PublishedNotice";
 import { ContributionForm } from "./ContributionForm";
 
 type Ready = {
@@ -24,17 +25,17 @@ type Ready = {
 
 type State = { step: "idle" } | { step: "reading"; fileName: string } | ({ step: "ready" } & Ready);
 
-/** Đẩy file PDF / Guitar Pro lên → đọc ngay trên trình duyệt thành phần nhạc phát được → nghe thử → gửi duyệt */
+/** Đẩy file PDF / Guitar Pro lên → đọc ngay trên trình duyệt thành phần nhạc phát được → nghe thử → đăng lên site */
 export function ContributeUploader({ lang }: { lang: Lang }) {
   const t = contributeText[lang];
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<State>({ step: "idle" });
   const [error, setError] = useState<string>();
-  const [notice, setNotice] = useState<string>();
+  const [published, setPublished] = useState<Published>();
 
   async function onPick(file: File | undefined) {
     setError(undefined);
-    setNotice(undefined);
+    setPublished(undefined);
     if (!file) return;
     const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
     if (!isPdf && !isScoreFile(file.name)) {
@@ -110,11 +111,7 @@ export function ContributeUploader({ lang }: { lang: Lang }) {
           {error}
         </p>
       )}
-      {notice && (
-        <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
-          {notice}
-        </p>
-      )}
+      {published && <PublishedNotice song={published} lang={lang} />}
       {state.step === "reading" && (
         <p role="status" className="text-sm font-semibold text-soft">
           {t.upload.reading(state.fileName)}
@@ -159,9 +156,9 @@ export function ContributeUploader({ lang }: { lang: Lang }) {
             defaultArtist={state.artist}
             lang={lang}
             onCancel={() => setState({ step: "idle" })}
-            onSent={(title) => {
+            onSent={(title, slug) => {
               setState({ step: "idle" });
-              setNotice(t.sent(title));
+              setPublished({ title, slug });
             }}
           />
         </>

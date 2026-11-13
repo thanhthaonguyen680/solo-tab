@@ -26,7 +26,8 @@ export function ContributionForm({
   cancelLabel?: string;
   lang: Lang;
   onCancel: () => void;
-  onSent: (title: string) => void;
+  /** Bài đã đăng: tên + đường dẫn để mở trang bài */
+  onSent: (title: string, slug: string) => void;
 }) {
   const t = contributeText[lang].form;
   const uid = useId(); // form có thể hiện ở cả 2 tab cùng lúc → id phải khác nhau
@@ -50,7 +51,7 @@ export function ContributionForm({
     }, lang).catch(() => ({ ok: false as const, error: t.network }));
     setSending(false);
     if (!result.ok) return setError(result.error);
-    onSent(result.title);
+    onSent(result.title, result.slug);
   }
 
   return (

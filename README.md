@@ -21,7 +21,7 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 ### 🤝 Cộng đồng cùng đóng góp
 - Nút **Đóng góp**: đăng ký / đăng nhập bằng tên đăng nhập + mật khẩu (không cần email).
 - **Đẩy file PDF hoặc Guitar Pro lên** là hệ thống tự dựng phần nhạc phát được ngay trên trình duyệt; nghe thử rồi gửi.
-- **Kiểm duyệt trước khi đăng:** admin nghe thử, duyệt hoặc trả về kèm lời nhắn. Bài được đăng ghi rõ **“Soạn tab bởi …”**.
+- **Đăng ngay, không cần chờ duyệt:** gửi xong là bài lên site, kèm nút mở thẳng trang bài. Bài ghi rõ người đóng góp; admin vẫn sửa, gỡ hoặc xoá được. Mỗi người tối đa 10 bài / 24 giờ để chống spam.
 
 ### 🛠 Trang quản trị gọn nhẹ
 - Thêm, sửa, xoá bài; đặt độ khó, tông, tempo mặc định cho từng bài.

@@ -7,11 +7,12 @@ import type { Lang } from "@/i18n";
 import { sql } from "@/lib/db";
 import { isFileNotation, isValidFileNotation } from "@/lib/notation-format";
 import { LEVELS, NOTATION_MAX_CHARS, slugify } from "@/lib/song-model";
+import { refreshPublicPages } from "@/lib/song-access";
 
-/** Số bài chờ duyệt tối đa từ một địa chỉ IP — chống spam khi không cần đăng nhập */
-const MAX_PENDING_PER_SUBMITTER = 10;
-/** Tổng số bài chờ duyệt tối đa trên cả site — chặn spam tràn database */
-const MAX_PENDING_TOTAL = 300;
+/** Số bài tối đa một địa chỉ IP được đăng trong 24 giờ — chống spam khi không cần đăng nhập */
+const MAX_PER_SUBMITTER_PER_DAY = 10;
+/** Tổng số bài đóng góp tối đa trên cả site trong 24 giờ — chặn spam tràn trang */
+const MAX_TOTAL_PER_DAY = 100;
 
 export type Contribution = {
   title: string;
@@ -28,7 +29,7 @@ export type Contribution = {
   website?: string;
 };
 
-export type ContributionResult = { ok: true; title: string } | { ok: false; error: string };
+export type ContributionResult = { ok: true; title: string; slug: string } | { ok: false; error: string };
 
 const ERRORS = {
   vi: {
@@ -39,8 +40,8 @@ const ERRORS = {
     level: "Chọn độ khó",
     rights: "Bạn cần xác nhận mình tự soạn (hoặc được phép đăng) tab này",
     notation: "Dữ liệu tab không hợp lệ hoặc quá lớn",
-    tooManyMine: (n: number) => `Bạn đang có ${n} bài chờ duyệt — đợi admin duyệt bớt rồi gửi tiếp nhé`,
-    tooManyTotal: "Đang có quá nhiều bài chờ duyệt — bạn quay lại sau ít hôm nhé",
+    tooManyMine: (n: number) => `You have published ${n} tabs in the last 24 hours — please come back tomorrow to post more`,
+    tooManyTotal: "The site has received a lot of tabs today — please try again later",
     slug: "Không tạo được đường dẫn cho bài — thử đổi tên bài",
   },
   en: {
@@ -64,11 +65,11 @@ async function submitterHash() {
   return createHash("sha256").update(`solo-tab:${ip}`).digest("hex");
 }
 
-/** Ai cũng gửi được (không cần tài khoản): tab đã dựng sẵn trên trình duyệt → chờ admin duyệt */
+/** Ai cũng gửi được (không cần tài khoản): tab đã dựng sẵn trên trình duyệt → đăng lên site ngay (admin vẫn gỡ / sửa được) */
 export async function submitContribution(c: Contribution, lang: Lang = "vi"): Promise<ContributionResult> {
   const t = ERRORS[lang === "en" ? "en" : "vi"];
   const title = String(c?.title ?? "").trim();
-  if (c?.website) return { ok: true, title }; // bot
+  if (c?.website) return { ok: true, title, slug: "" }; // bot: giả như thành công, không lưu gì
 
   const artist = String(c.artist ?? "").trim();
   const name = String(c.name ?? "").trim().replace(/\s+/g, " ");
@@ -89,11 +90,11 @@ export async function submitContribution(c: Contribution, lang: Lang = "vi"): Pr
   const who = await submitterHash();
   const [{ mine, total }] = await sql`
     select count(*) filter (where submitter_hash = ${who})::int as mine, count(*)::int as total
-    from songs where status = 'pending'`;
-  if (mine >= MAX_PENDING_PER_SUBMITTER) {
+    from songs where submitted_at > now() - interval '24 hours'`;
+  if (mine >= MAX_PER_SUBMITTER_PER_DAY) {
     return { ok: false, error: t.tooManyMine(mine) };
   }
-  if (total >= MAX_PENDING_TOTAL) {
+  if (total >= MAX_TOTAL_PER_DAY) {
     return { ok: false, error: t.tooManyTotal };
   }
 
@@ -104,11 +105,14 @@ export async function submitContribution(c: Contribution, lang: Lang = "vi"): Pr
     const rows = await sql`
       insert into songs (slug, title, artist, collection, level, bpm, notation, status,
                          contributor_name, submitter_hash, submitted_at)
-      values (${slug}, ${title}, ${artist || null}, ${c.collection}, ${c.level}, ${bpm}, ${notation}, 'pending',
+      values (${slug}, ${title}, ${artist || null}, ${c.collection}, ${c.level}, ${bpm}, ${notation}, 'published',
               ${name || null}, ${who}, now())
       on conflict (slug) do nothing
       returning slug`;
-    if (rows.length) return { ok: true, title };
+    if (rows.length) {
+      refreshPublicPages(slug); // danh sách bài + trang bài hiện bài mới ngay
+      return { ok: true, title, slug };
+    }
   }
   return { ok: false, error: t.slug };
 }

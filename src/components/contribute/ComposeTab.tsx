@@ -7,6 +7,7 @@ import { NewTabForm } from "@/components/editor/NewTabForm";
 import { TabPlayer } from "@/components/TabPlayer";
 import { langOf, type Lang } from "@/i18n";
 import { contributeText } from "./contribute-i18n";
+import { type Published, PublishedNotice } from "./PublishedNotice";
 import { ContributionForm } from "./ContributionForm";
 
 // Trình soạn nặng (alphaTab) → chỉ tải khi bấm "Mở trình soạn"
@@ -22,11 +23,11 @@ type Step =
   | { kind: "edit"; notation: string; bpm: number; song: Song; isNew: boolean }
   | { kind: "send"; notation: string; bpm: number; song: Song };
 
-/** Soạn tab từ đầu ngay trên trình duyệt: chọn khung tab → soạn với thanh công cụ → điền thông tin → gửi duyệt */
+/** Soạn tab từ đầu ngay trên trình duyệt: chọn khung tab → soạn với thanh công cụ → điền thông tin → đăng lên site */
 export function ComposeTab({ lang }: { lang: Lang }) {
   const t = contributeText[lang];
   const [step, setStep] = useState<Step>({ kind: "setup" });
-  const [notice, setNotice] = useState<string>();
+  const [published, setPublished] = useState<Published>();
 
   return (
     <div className="flex flex-col gap-4">
@@ -35,11 +36,7 @@ export function ComposeTab({ lang }: { lang: Lang }) {
         <p className="text-sm text-muted">{t.compose.intro}</p>
       </div>
 
-      {notice && (
-        <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
-          {notice}
-        </p>
-      )}
+      {published && <PublishedNotice song={published} lang={lang} />}
 
       {step.kind === "setup" && (
         <NewTabForm
@@ -47,7 +44,7 @@ export function ComposeTab({ lang }: { lang: Lang }) {
           lang={lang}
           contribute
           onCreated={(notation, bpm, song) => {
-            setNotice(undefined);
+            setPublished(undefined);
             setStep({ kind: "edit", notation, bpm, song, isNew: true });
           }}
         />
@@ -93,9 +90,9 @@ export function ComposeTab({ lang }: { lang: Lang }) {
             onCancel={() => {
               if (confirm(t.compose.confirmDiscard)) setStep({ kind: "setup" });
             }}
-            onSent={(title) => {
+            onSent={(title, slug) => {
               setStep({ kind: "setup" });
-              setNotice(t.sent(title));
+              setPublished({ title, slug });
             }}
           />
         </>

@@ -9,8 +9,9 @@ const vi = {
     "Cùng góp những bản soạn guitar fingerstyle hay cho cộng đồng: tải file Guitar Pro / PDF lên hoặc tự soạn tab ngay trên trình duyệt.",
   eyebrow: "Đóng góp",
   title: ["Gửi tab ", "của bạn"] as [string, string],
-  lead: "Cùng góp những bản soạn hay cho cộng đồng guitar fingerstyle nhé! Có sẵn file thì tải lên, chưa có thì cứ thoải mái soạn ngay tại đây. Gửi xong, bài sẽ chờ admin duyệt ít phút rồi hiện trên site.",
-  sent: (title: string) => `✓ Đã gửi “${title}”. Bài đang chờ duyệt — ít phút nữa sẽ hiện trên site.`,
+  lead: "Cùng góp những bản soạn hay cho cộng đồng guitar fingerstyle nhé! Có sẵn file thì tải lên, chưa có thì cứ thoải mái soạn ngay tại đây. Gửi xong là bài lên site ngay.",
+  sent: (title: string) => `✓ Đã đăng “${title}” lên site.`,
+  view: "Xem bài →",
   tabs: {
     region: "Gửi bài",
     list: "Cách đóng góp",
@@ -35,7 +36,7 @@ const vi = {
         🎸 Đã dựng phần nhạc từ <b>{name}</b>: {bars} ô nhịp. Bấm phát để nghe thử.
       </>
     ),
-    oddBars: (bars: string) => `Có thể đọc chưa chuẩn ở ô ${bars} — admin sẽ nghe và chỉnh khi duyệt.`,
+    oddBars: (bars: string) => `Có thể đọc chưa chuẩn ở ô ${bars} — nghe thử trước khi đăng nhé.`,
     track: "Track hiển thị:",
     notes: (n: number) => `${n} nốt`,
   },
@@ -80,8 +81,9 @@ const en: ContributeText = {
     "Share great fingerstyle guitar arrangements with the community: upload a Guitar Pro / PDF file or compose a tab right in your browser.",
   eyebrow: "Contribute",
   title: ["Share ", "your tab"],
-  lead: "Share your favourite arrangements with the fingerstyle guitar community! Got a file? Upload it. No file yet? Compose away right here. Once sent, your tab waits a few minutes for the admin to approve it, then goes live.",
-  sent: (title) => `✓ “${title}” sent. It’s waiting for approval and will be live in a few minutes.`,
+  lead: "Share your favourite arrangements with the fingerstyle guitar community! Got a file? Upload it. No file yet? Compose away right here. Once you submit, your tab goes live right away.",
+  sent: (title) => `✓ “${title}” is now live on the site.`,
+  view: "View tab →",
   tabs: {
     region: "Submit a tab",
     list: "Ways to contribute",
@@ -106,7 +108,7 @@ const en: ContributeText = {
         🎸 Built a playable tab from <b>{name}</b>: {bars} {bars === 1 ? "bar" : "bars"}. Press play to listen.
       </>
     ),
-    oddBars: (bars) => `Bars ${bars} may not have been read perfectly — the admin will listen and fix them during review.`,
+    oddBars: (bars) => `Bars ${bars} may not have been read perfectly — have a listen before you publish.`,
     track: "Track to show:",
     notes: (n) => `${n} ${n === 1 ? "note" : "notes"}`,
   },
