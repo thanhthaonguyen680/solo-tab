@@ -216,22 +216,49 @@ function splitLength(q: number) {
  * bè dưới = đuôi xuống / nốt tròn bass), rồi xếp mọi nốt theo thời điểm; mỗi beat kéo dài tới nốt vang kế tiếp.
  * Nốt bass ngân dài vẫn ngân nhờ let ring. `carried`: nốt cuối ô trước — nối sang nếu ô mở đầu bằng nốt ngân.
  */
-function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[] {
+function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[] | null {
   const hasUp = cols.some((c) => stemDir(c) === "up");
-  const voiceOf = (c: Column) => {
-    if (c.rest) return (c.y ?? 0) < std.lines[2] ? 1 : 2;
+  const noteVoice = (c: Column) => {
     const d = stemDir(c);
     if (d) return d === "up" ? 1 : 2;
     return hasUp ? 2 : 1;
   };
+  const voiceOf = (c: Column) => {
+    if (!c.rest) return noteVoice(c);
+    // Dấu lặng đứng cùng chỗ với nốt của một bè thì thuộc bè kia (bè đó đang có nốt ở thời điểm này)
+    const beside = cols.find((n) => !n.rest && !n.grace && n.heads?.length && Math.abs(n.x - c.x) < 4);
+    if (beside) return noteVoice(beside) === 1 ? 2 : 1;
+    return (c.y ?? 0) <= std.lines[2] ? 1 : 2;
+  };
   type Event = { x: number; notes: TabNote[]; rest: boolean; chord?: string; arpeggio: boolean };
   const events = new Map<number, Event>();
-  let barLength = 0;
-  for (const v of [1, 2]) {
+  // Mỗi bè: các cột cùng chỗ (vd. hợp âm trắng + nốt bass tròn) vang cùng lúc → một bước;
+  // bước kế tiếp bắt đầu sau nốt ngắn nhất của bước này
+  const voices = [1, 2].map((v) => {
+    const steps: { t: number; cols: Column[] }[] = [];
     let t = 0;
-    for (const c of cols.filter((c) => !c.grace && voiceOf(c) === v).sort((a, b) => a.x - b.x)) {
-      if (c.rest || c.notes.length) {
-        const key = Math.round(t * 1000) / 1000;
+    let end = 0;
+    const list = cols.filter((c) => !c.grace && voiceOf(c) === v).sort((a, b) => a.x - b.x);
+    for (let i = 0; i < list.length; ) {
+      const group = [list[i]];
+      while (i + group.length < list.length && list[i + group.length].x - list[i].x < 6) group.push(list[i + group.length]);
+      steps.push({ t, cols: group });
+      end = Math.max(end, ...group.map((c) => t + lengthOf(c)));
+      t += Math.min(...group.map(lengthOf));
+      i += group.length;
+    }
+    return { steps, length: Math.max(t, end) };
+  });
+  const barLength = Math.max(4, ...voices.map((v) => v.length));
+  voices.forEach((voice, i) => {
+    // Bè giai điệu vào muộn (Guitar Pro không in dấu lặng đầu ô) → căn về cuối ô
+    const first = voice.steps[0]?.cols[0];
+    const missing = barLength - voice.length;
+    const shift = i === 0 && first && !first.rest && missing > 0.99 && Number.isInteger(Math.round(missing * 1000) / 1000) ? missing : 0;
+    for (const { t, cols: group } of voice.steps) {
+      for (const c of group) {
+        if (!c.rest && !c.notes.length) continue;
+        const key = Math.round((t + shift) * 1000) / 1000;
         const e = events.get(key) ?? { x: c.x, notes: [], rest: false, arpeggio: false };
         e.x = Math.min(e.x, c.x);
         if (c.rest) e.rest = true;
@@ -240,12 +267,14 @@ function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[
         e.arpeggio ||= Boolean(c.arpeggio);
         events.set(key, e);
       }
-      t += lengthOf(c);
     }
-    barLength = Math.max(barLength, t);
-  }
+  });
   const graces = cols.filter((c) => c.grace && !c.rest && c.notes.length);
   const onsets = [...events.keys()].sort((a, b) => a - b);
+  // Kiểm tra: nốt vang sau phải nằm bên phải trên sheet — ngược thì đã đoán sai bè, không dùng kết quả này
+  for (let i = 1; i < onsets.length; i++) {
+    if (events.get(onsets[i])!.x < events.get(onsets[i - 1])!.x - 8) return null;
+  }
   const beats: TabBeat[] = [];
   const push = (length: number, notes: TabNote[], first: Partial<TabBeat> = {}) =>
     splitLength(length).forEach((p, k) =>
@@ -431,6 +460,14 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
           const c = cols.find((c) => !c.stem && c.heads && near((c.heads[0].x0 + c.heads[0].x1) / 2, (h.x0 + h.x1) / 2, 7));
           if (c) c.heads!.push(h);
           else cols.push({ x: 0, stem: null, heads: [h], dur: 4, dots: 0, notes: [] });
+        }
+        // Một đuôi mang cả đầu nốt đen lẫn đầu nốt trắng = 2 bè chung chỗ (giai điệu 1 phách + hợp âm ngân 2 phách)
+        // → tách làm 2 cột cùng vị trí để mỗi phần có trường độ riêng
+        for (const c of [...cols]) {
+          const open = c.heads?.filter((h) => h.kind === "head-open") ?? [];
+          if (!open.length || open.length === c.heads!.length) continue;
+          c.heads = c.heads!.filter((h) => h.kind !== "head-open");
+          cols.push({ ...c, heads: open, notes: [] });
         }
         for (const c of cols) {
           if (!c.heads) continue; // cột của sheet chỉ có tab — đã tính trường độ ở trên
