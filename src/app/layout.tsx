@@ -9,10 +9,11 @@ const zalando = Zalando_Sans({
   subsets: ["latin", "vietnamese"],
 });
 
+// Font tiêu đề: cả site chỉ dùng độ đậm 600 (h1, h2, logo…) → tải đúng 1 độ đậm thay vì 3
 const chakra = Chakra_Petch({
   variable: "--font-chakra",
   subsets: ["latin", "vietnamese"],
-  weight: ["500", "600", "700"],
+  weight: "600",
 });
 
 const jetbrains = JetBrains_Mono({
