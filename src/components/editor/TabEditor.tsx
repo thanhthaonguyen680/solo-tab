@@ -4,6 +4,7 @@ import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { patchSlidePlayback } from "@/lib/alphatab-slides";
+import { brushTicks } from "@/lib/pdf-tab/alphatex";
 import { applySongInfo, decodeNotation, encodeScoreFile } from "@/lib/notation-format";
 import { saveScore } from "@/lib/song-content-actions";
 import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
@@ -19,6 +20,8 @@ type Box = { x: number; y: number; w: number; h: number };
 const DURATIONS = [1, 2, 4, 8, 16, 32]; // tròn → móc ba
 const HISTORY_LIMIT = 60;
 const BPM_STEP = 4, BPM_MIN = 30, BPM_MAX = 240;
+/** model.BrushType của alphaTab: BrushDown vẽ mũi tên ↑ (quạt từ dây trầm), BrushUp vẽ mũi tên ↓ */
+const BRUSH_UP = 1, BRUSH_DOWN = 2;
 
 /**
  * Trình sửa tab trực quan: bấm vào nốt rồi sửa bằng bàn phím, nghe thử ngay, hoàn tác, lưu lên site.
@@ -85,7 +88,7 @@ export function TabEditor({
   const [startBpm, setStartBpm] = useState<number | null>(null);
   const bpmRef = useRef<{ base: number; current: number | null }>({ base: 120, current: null });
   /** Trường độ / trạng thái của beat đang chọn — để tô sáng nút trên thanh công cụ */
-  const [sel, setSel] = useState<{ duration: number; dots: number; note: boolean } | null>(null);
+  const [sel, setSel] = useState<{ duration: number; dots: number; note: boolean; brush: number } | null>(null);
   /** Vị trí con trỏ chuột lúc bấm (toạ độ trong vùng vẽ) — để biết đã bấm vào dây nào; shift = đang chọn nhiều ô */
   const pointRef = useRef<{ x: number; y: number; shift: boolean } | null>(null);
   /** Chọn nhiều ô: từ ô `anchor` tới ô của con trỏ (Shift + bấm, Shift + ← →) */
@@ -140,7 +143,7 @@ export function TabEditor({
     // Một beat có vị trí ở cả khuông nhạc lẫn khuông tab → lấy khuông tab (nằm dưới cùng)
     const all = beat && lookup ? lookup.findBeats(beat) ?? [] : [];
     const bb = all.sort((a, b) => b.visualBounds.y - a.visualBounds.y)[0];
-    setSel(beat ? { duration: beat.duration, dots: beat.dots, note: !!noteAt(c) } : null);
+    setSel(beat ? { duration: beat.duration, dots: beat.dots, note: !!noteAt(c), brush: beat.brushType } : null);
     if (!beat || !bb) { box.style.display = "none"; return; }
     const note = noteAt(c);
     const nb = note && all.flatMap((x) => x.notes ?? []).filter((n) => n.note === note).sort((a, b) => b.noteHeadBounds.y - a.noteHeadBounds.y)[0];
@@ -159,11 +162,12 @@ export function TabEditor({
     const what = note
       ? note.isDead ? t.deadNote : `${t.fret(note.fret)}${note.slideOutType ? t.slideTag : ""}${note.isLetRing ? t.letRingTag : ""}`
       : t.emptySpot(beat.isRest);
+    const brush = beat.brushType === BRUSH_DOWN ? t.brushDownTag : beat.brushType === BRUSH_UP ? t.brushUpTag : "";
     const gap = voiceTicks(beat.voice) - barCapacity(beat.voice.bar.masterBar);
     // trạng thái phách để ngay đầu (dòng này bị cắt bớt khi màn hình hẹp)
     const barState = gap === 0 ? "" : ` (⚠ ${gap < 0 ? t.short : t.over} ${formatBeats(Math.abs(gap), t)})`;
     const picked = to > from ? t.picked(from + 1, to + 1) : "";
-    setInfo(`${picked}${t.info(c.bar + 1, barState, c.beat + 1, c.string, what, dur)}`);
+    setInfo(`${picked}${t.info(c.bar + 1, barState, c.beat + 1, c.string, what + brush, dur)}`);
   }, [t]);
 
   const setCursor = useCallback((c: Cursor) => {
@@ -588,6 +592,27 @@ export function TabEditor({
     if (note) commit(() => { note.isLetRing = !note.isLetRing; });
   };
 
+  /** Rải dây cả phách (quạt): bấm lại đúng kiểu đang bật thì tắt */
+  const setBrush = (type: number) => {
+    const x = context();
+    if (!x?.beat || x.beat.isRest) return;
+    const { lib, beat } = x;
+    commit(() => {
+      const off = beat.brushType === type;
+      beat.brushType = off ? lib.model.BrushType.None : (type as model.BrushType);
+      // alphaTab chỉ rải tiếng khi có độ dài cú quạt
+      beat.brushDuration = off ? 0 : brushTicks(beat.notes.length);
+    });
+  };
+  /** Phím B: không rải → rải ↑ → rải ↓ → không rải */
+  const cycleBrush = () => {
+    const beat = context()?.beat;
+    if (!beat) return;
+    if (beat.brushType === BRUSH_DOWN) setBrush(BRUSH_UP);
+    else if (beat.brushType === BRUSH_UP) setBrush(BRUSH_UP); // bấm lại kiểu đang bật → tắt
+    else setBrush(BRUSH_DOWN);
+  };
+
   /** Bấm nút trên thanh công cụ: làm thao tác rồi trả bàn phím về vùng tab để gõ tiếp */
   const run = (fn: () => void) => { fn(); focusHost(); };
 
@@ -690,6 +715,8 @@ export function TabEditor({
       S: toggleSlide,
       l: toggleLetRing,
       L: toggleLetRing,
+      b: cycleBrush,
+      B: cycleBrush,
     };
     const action = actions[key];
     if (action) { handled(); action(); }
@@ -837,6 +864,8 @@ export function TabEditor({
             <Chip onClick={() => run(toggleDead)} disabled={!sel} title={t.deadTitle}>xx</Chip>
             <Chip onClick={() => run(toggleSlide)} disabled={!sel?.note} title={t.slideTitle}>{t.slide}</Chip>
             <Chip onClick={() => run(toggleLetRing)} disabled={!sel?.note} title={t.letRingTitle}>{t.letRing}</Chip>
+            <Chip on={sel?.brush === BRUSH_DOWN} onClick={() => run(() => setBrush(BRUSH_DOWN))} disabled={!sel?.note} title={t.brushDownTitle}>{t.brushDown}</Chip>
+            <Chip on={sel?.brush === BRUSH_UP} onClick={() => run(() => setBrush(BRUSH_UP))} disabled={!sel?.note} title={t.brushUpTitle}>{t.brushUp}</Chip>
           </ToolGroup>
         </div>
       </div>

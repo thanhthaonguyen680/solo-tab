@@ -16,6 +16,8 @@ export type TabBeat = {
   arpeggio: boolean;
   /** Nốt hoa mỹ (láy) — in nhỏ, không chiếm phách */
   grace?: boolean;
+  /** Rải dây (quạt) theo mũi tên trên tab: "down" = mũi tên lên (quạt từ dây trầm), "up" = mũi tên xuống */
+  brush?: "down" | "up";
 };
 export type TabBar = {
   page: number;
@@ -53,6 +55,7 @@ type Column = {
   chord?: string;
   arpeggio?: boolean;
   grace?: boolean;
+  brush?: "down" | "up";
 };
 
 const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
@@ -238,7 +241,7 @@ function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[
     if (beside) return noteVoice(beside) === 1 ? 2 : 1;
     return (c.y ?? 0) <= std.lines[2] ? 1 : 2;
   };
-  type Event = { x: number; notes: TabNote[]; rest: boolean; chord?: string; arpeggio: boolean };
+  type Event = { x: number; notes: TabNote[]; rest: boolean; chord?: string; arpeggio: boolean; brush?: "down" | "up" };
   const events = new Map<number, Event>();
   // Mỗi bè: các cột cùng chỗ (vd. hợp âm trắng + nốt bass tròn) vang cùng lúc → một bước;
   // bước kế tiếp bắt đầu sau nốt ngắn nhất của bước này
@@ -273,6 +276,7 @@ function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[
         for (const n of c.notes) if (!e.notes.some((m) => m.string === n.string)) e.notes.push(n);
         e.chord ??= c.chord;
         e.arpeggio ||= Boolean(c.arpeggio);
+        e.brush ??= c.brush;
         events.set(key, e);
       }
     }
@@ -304,7 +308,7 @@ function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[
     }
     const end = i + 1 < onsets.length ? onsets[i + 1] : barLength;
     const notes = e.notes.sort((a, b) => a.string - b.string);
-    push(end - t, e.rest && !notes.length ? [] : notes, { chord: e.chord, arpeggio: e.arpeggio });
+    push(end - t, e.rest && !notes.length ? [] : notes, { chord: e.chord, arpeggio: e.arpeggio, brush: e.brush });
   });
   return beats;
 }
@@ -393,6 +397,10 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
       const dots = of("dot");
       const restBlocks = of("rest-block");
       const arpeggios = zone.filter((f) => near(f.x1 - f.x0, 3.3, 0.4) && near(f.y1 - f.y0, 4.9, 0.4) && f.n === 28);
+      // Rải dây (Guitar Pro 8): mũi tên dọc trên khuông tab, đầu mũi tên là ký tự SMuFL — EB78 ↑ ở trên, EB7C ↓ ở dưới
+      const brushes = g.glyphs
+        .filter((m) => (m.code === 0xeb78 || m.code === 0xeb7c) && m.y >= tab.lines[0] - 12 && m.y <= tab.lines[5] + 12)
+        .map((m) => ({ x: m.x + m.w / 2, dir: m.code === 0xeb78 ? ("down" as const) : ("up" as const) }));
 
       const barlines = findBarlines(g.segments, tab, std, smufl ? verticalBars : undefined);
       // Dòng kẻ tab bị ngắt quanh các con số → mép khuông lấy theo vạch nhịp đầu / cuối dòng
@@ -582,6 +590,12 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
           const c = cols.filter((c) => !c.rest).sort((a, b) => Math.abs(a.x - cx) - Math.abs(b.x - cx))[0];
           if (c) c.chord = ch.str.trim();
         }
+        // Mũi tên rải đứng ngay trước các số của phách được rải
+        for (const b of brushes) {
+          if (!inBar(b.x)) continue;
+          const c = cols.filter((c) => !c.rest && !c.grace && c.notes.length && c.x > b.x && c.x - b.x < 25).sort((a, c) => a.x - c.x)[0];
+          if (c) c.brush = b.dir;
+        }
 
         const oneLineBeats = () => cols
           .filter((c) => !(c.grace && c.rest))
@@ -593,6 +607,7 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
             chord: c.chord,
             arpeggio: Boolean(c.arpeggio),
             grace: c.grace,
+            brush: c.brush,
           }));
         // Gộp 2 bè chỉ khi không làm rơi nốt nào (2 nốt cùng dây cùng lúc sẽ bị gộp làm một)
         const played = (bs: TabBeat[]) => bs.reduce((n, b) => n + b.notes.filter((x) => !x.tie).length, 0);

@@ -19,6 +19,8 @@ const vi = {
   fret: (n: number) => `phím ${n}`,
   slideTag: " · luyến",
   letRingTag: " · ngân",
+  brushDownTag: " · rải ↑",
+  brushUpTag: " · rải ↓",
   emptySpot: (isRest: boolean) => `${isRest ? "dấu lặng" : "dây trống"} → gõ số để thêm nốt`,
   short: "thiếu",
   over: "thừa",
@@ -97,6 +99,10 @@ const vi = {
   slideTitle: "Luyến sang nốt sau (phím S)",
   letRing: "Ngân",
   letRingTitle: "Ngân (phím L)",
+  brushDown: "Rải ↑",
+  brushDownTitle: "Rải dây cả phách từ dây trầm lên dây cao — mũi tên ↑ trên tab (phím B)",
+  brushUp: "Rải ↓",
+  brushUpTitle: "Rải dây cả phách từ dây cao xuống dây trầm — mũi tên ↓ trên tab (phím B)",
   // cảnh báo phách
   warnLead: (
     <>
@@ -128,7 +134,7 @@ const vi = {
     <><K>Shift + ↑ ↓</K>: chuyển nốt sang dây bên cạnh, giữ cao độ</>,
     <><K>Delete</K>: xoá nốt · <K>Shift + Delete</K>: xoá cả beat</>,
     <><K>+ / −</K>: dài hơn / ngắn hơn · <K>.</K>: chấm dôi (ô bị thừa phách thì tự bớt dấu lặng cuối ô hoặc dồn nốt sang ô sau)</>,
-    <><K>X</K>: bật/tắt tiếng đập “xx” · <K>S</K>: luyến · <K>L</K>: ngân</>,
+    <><K>X</K>: bật/tắt tiếng đập “xx” · <K>S</K>: luyến · <K>L</K>: ngân · <K>B</K>: rải dây ↑ / ↓</>,
     <>
       <K>⌘/Ctrl + C</K>: chép ô · <K>⌘/Ctrl + V</K>: dán đè · <K>Shift + ⌘/Ctrl + V</K>: dán chèn · chọn nhiều ô: <K>Shift + bấm</K> hoặc{" "}
       <K>Shift + ← →</K>
@@ -178,6 +184,8 @@ const en: EditorText = {
   fret: (n) => `fret ${n}`,
   slideTag: " · slide",
   letRingTag: " · let ring",
+  brushDownTag: " · strum ↑",
+  brushUpTag: " · strum ↓",
   emptySpot: (isRest) => `${isRest ? "rest" : "empty string"} → type a number to add a note`,
   short: "short",
   over: "over",
@@ -252,6 +260,10 @@ const en: EditorText = {
   slideTitle: "Slide into the next note (S)",
   letRing: "Let ring",
   letRingTitle: "Let ring (L)",
+  brushDown: "Strum ↑",
+  brushDownTitle: "Strum the whole beat from the low string up — ↑ arrow on the tab (B)",
+  brushUp: "Strum ↓",
+  brushUpTitle: "Strum the whole beat from the high string down — ↓ arrow on the tab (B)",
   warnLead: (
     <>
       <b>⚠ Some bars have the wrong number of beats.</b> On playback every bar takes its full length: a <b>short</b> bar ends with a gap,
@@ -281,7 +293,7 @@ const en: EditorText = {
     <><K>Shift + ↑ ↓</K>: move the note to the next string, keeping its pitch</>,
     <><K>Delete</K>: delete the note · <K>Shift + Delete</K>: delete the whole beat</>,
     <><K>+ / −</K>: longer / shorter · <K>.</K>: dotted (if the bar gets too long, rests at the end are trimmed or notes move to the next bar)</>,
-    <><K>X</K>: toggle dead note “xx” · <K>S</K>: slide · <K>L</K>: let ring</>,
+    <><K>X</K>: toggle dead note “xx” · <K>S</K>: slide · <K>L</K>: let ring · <K>B</K>: strum ↑ / ↓</>,
     <>
       <K>⌘/Ctrl + C</K>: copy bars · <K>⌘/Ctrl + V</K>: paste over · <K>Shift + ⌘/Ctrl + V</K>: paste as new · select several bars:{" "}
       <K>Shift + click</K> or <K>Shift + ← →</K>

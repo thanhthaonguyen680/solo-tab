@@ -13,6 +13,10 @@ export function reportOf(tab: ParsedTab): TabReport {
   };
 }
 
+/** Rải dây: mỗi dây vang sau dây trước bao nhiêu tick (960 tick = 1 phách đen) — ~20 ms ở 90 BPM, như quạt tay thật */
+export const BRUSH_TICKS_PER_STRING = 30;
+export const brushTicks = (notes: number) => BRUSH_TICKS_PER_STRING * Math.max(1, notes - 1);
+
 /** Dấu lặng bù cho đủ ô: [số phách đen, trường độ] */
 const REST_VALUES: [number, number][] = [[4, 1], [2, 2], [1, 4], [0.5, 8], [0.25, 16], [0.125, 32]];
 
@@ -62,6 +66,8 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
       if (b.grace) fx.push("gr"); // nốt hoa mỹ: không chiếm phách, ăn bớt thời gian của nốt trước
       if (b.chord) fx.push(`ch "${esc(b.chord)}"`);
       if (b.arpeggio) fx.push("au");
+      // alphaTab: bd = quạt từ dây trầm lên (mũi tên chỉ lên trên sheet), bu = quạt ngược lại; kèm độ dài cú quạt
+      else if (b.brush) fx.push(`${b.brush === "down" ? "bd" : "bu"} ${brushTicks(b.notes.length)}`);
       let body = "r";
       if (!b.rest && b.notes.length) {
         const notes = b.notes.map((n) => {
