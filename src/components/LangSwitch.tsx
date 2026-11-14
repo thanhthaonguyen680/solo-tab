@@ -24,7 +24,9 @@ function PathAwareSwitch({ lang }: { lang: Lang }) {
 function Switch({ lang, href }: { lang: Lang; href: string }) {
   const other: Lang = lang === "en" ? "vi" : "en";
   return (
-    <Link href={href} hrefLang={other} lang={other} title={dict[lang].switchTo} aria-label={dict[lang].switchTo} className={pill}>
+    <Link href={href} hrefLang={other} lang={other} title={dict[lang].switchTo} className={pill}>
+      {/* Tên đọc cho trình đọc màn hình = chữ hiển thị (VI EN) + câu giải thích — không dùng aria-label đè chữ */}
+      <span className="sr-only">{dict[lang].switchTo}: </span>
       {/* Điện thoại: chỉ hiện ngôn ngữ sẽ chuyển sang, cho vừa thanh menu */}
       {(["vi", "en"] as const).map((l) => (
         <span

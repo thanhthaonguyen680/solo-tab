@@ -56,6 +56,8 @@ export function TabPlayer({
   });
   const [status, setStatus] = useState<Status>({ kind: "loading", label: t.drawing });
   const [playerReady, setPlayerReady] = useState(false);
+  /** Tab đã vẽ xong lần đầu — trước đó giữ sẵn chiều cao cho khung để trang không bị xô lệch khi tab hiện ra */
+  const [drawn, setDrawn] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState({ current: 0, end: 0 });
   /** Tempo ghi trong dữ liệu nốt, tempo mặc định khi mở bài, và tempo người xem đang chọn */
@@ -140,7 +142,10 @@ export function TabPlayer({
           api.countInVolume = prefsRef.current.countIn ? 1 : 0;
         }
       });
-      api.renderFinished.on(() => setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: t.loadingSound } : s)));
+      api.renderFinished.on(() => {
+        setDrawn(true);
+        setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: t.loadingSound } : s));
+      });
       api.soundFontLoad.on((e) => {
         const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
         setStatus({ kind: "loading", label: `${t.loadingSound} ${pct}%` });
@@ -314,22 +319,26 @@ export function TabPlayer({
         </div>
       </div>
 
-      {status.kind !== "ready" && (
-        <p
-          role={status.kind === "error" ? "alert" : "status"}
-          className={`text-sm ${status.kind === "error" ? "text-red-400" : "text-muted"}`}
+      <div className="relative">
+        {/* Thông báo nằm chồng trong khung tab (không chen lên trên đẩy khung xuống khi biến mất) */}
+        {status.kind !== "ready" && (
+          <p
+            role={status.kind === "error" ? "alert" : "status"}
+            className={`absolute top-3 left-3 z-[1] rounded-md bg-surface/90 px-2 py-1 text-sm ${
+              status.kind === "error" ? "text-red-400" : "text-muted"
+            }`}
+          >
+            {status.kind === "error" ? status.message : status.label}
+          </p>
+        )}
+        <div
+          ref={scrollRef}
+          className={`tab-player tab-scroll rounded-xl border border-line bg-surface p-2 sm:p-4 ${
+            horizontal ? "overflow-x-auto overflow-y-hidden overscroll-x-contain" : "overflow-hidden"
+          } ${drawn ? "" : "min-h-[300px] sm:min-h-[560px]"}`}
         >
-          {status.kind === "error" ? status.message : status.label}
-        </p>
-      )}
-
-      <div
-        ref={scrollRef}
-        className={`tab-player tab-scroll rounded-xl border border-line bg-surface p-2 sm:p-4 ${
-          horizontal ? "overflow-x-auto overflow-y-hidden overscroll-x-contain" : "overflow-hidden"
-        }`}
-      >
-        <div ref={hostRef} />
+          <div ref={hostRef} />
+        </div>
       </div>
       <p className="text-xs text-muted">{t.hint}</p>
     </section>
