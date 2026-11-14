@@ -2,7 +2,6 @@
 
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
-import { collections } from "@/config/site";
 import type { Lang } from "@/i18n";
 import { sql } from "@/lib/db";
 import { isFileNotation, isValidFileNotation } from "@/lib/notation-format";
@@ -19,7 +18,6 @@ export type Contribution = {
   artist: string;
   /** Tên người gửi (tuỳ chọn) — hiện là người soạn tab trên trang bài */
   name: string;
-  collection: string;
   level: string;
   /** Tab tương tác: "@score:<track>;<base64>" (file Guitar Pro / tab tự soạn) hoặc alphaTex (đọc từ PDF) */
   notation: string;
@@ -36,7 +34,6 @@ const ERRORS = {
     title: "Nhập tên bài (tối đa 200 ký tự)",
     artist: "Tên ca sĩ / tác giả tối đa 200 ký tự",
     name: "Tên của bạn tối đa 60 ký tự",
-    collection: "Chọn kho bài",
     level: "Chọn độ khó",
     rights: "Bạn cần xác nhận mình tự soạn (hoặc được phép đăng) tab này",
     notation: "Dữ liệu tab không hợp lệ hoặc quá lớn",
@@ -48,7 +45,6 @@ const ERRORS = {
     title: "Enter a song title (up to 200 characters)",
     artist: "Artist name can be up to 200 characters",
     name: "Your name can be up to 60 characters",
-    collection: "Choose a collection",
     level: "Choose a level",
     rights: "Please confirm you arranged this tab yourself (or have permission to post it)",
     notation: "The tab data is invalid or too large",
@@ -76,7 +72,6 @@ export async function submitContribution(c: Contribution, lang: Lang = "vi"): Pr
   if (!title || title.length > 200) return { ok: false, error: t.title };
   if (artist.length > 200) return { ok: false, error: t.artist };
   if (name.length > 60) return { ok: false, error: t.name };
-  if (!Object.hasOwn(collections, c.collection)) return { ok: false, error: t.collection };
   if (!(LEVELS as readonly string[]).includes(c.level)) return { ok: false, error: t.level };
   if (c.rights !== true) return { ok: false, error: t.rights };
 
@@ -107,7 +102,7 @@ export async function submitContribution(c: Contribution, lang: Lang = "vi"): Pr
     const rows = await sql`
       insert into songs (slug, title, artist, collection, level, bpm, notation, status,
                          contributor_name, submitter_hash, submitted_at)
-      values (${slug}, ${title}, ${artist || null}, ${c.collection}, ${c.level}, ${bpm}, ${notation}, 'published',
+      values (${slug}, ${title}, ${artist || null}, 'solo', ${c.level}, ${bpm}, ${notation}, 'published',
               ${name || null}, ${who}, now())
       on conflict (slug) do nothing
       returning slug`;

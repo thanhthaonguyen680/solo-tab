@@ -20,10 +20,6 @@ const vi = {
   footer: { contact: "Liên hệ" },
   level: { "Dễ": "Dễ", "Vừa": "Vừa", "Khó": "Khó" } as Record<Level, string>,
   badge: { new: "Mới", free: "Miễn phí" },
-  collections: {
-    solo: "Fingerstyle, intro, đoạn solo — chơi một mình vẫn đầy đủ.",
-    melody: "Giai điệu chính của bài hát, dễ bắt đầu, dễ đệm cùng.",
-  },
   songs: (n: number) => `${n} bài`,
   home: {
     updated: "Cập nhật mỗi tuần",
@@ -35,10 +31,6 @@ const vi = {
     latestTitle: "Danh sách bài",
     /** Nút hiện thêm bài ở cuối danh sách trang chủ */
     more: (left: number) => `Xem thêm (còn ${left} bài)`,
-  },
-  collection: {
-    back: "← Trang chủ",
-    request: "Chưa có bài bạn cần? Yêu cầu bài →",
   },
   browser: {
     search: "Tìm bài",
@@ -57,6 +49,7 @@ const vi = {
     noAudio: "Không có bài nào có audio.",
   },
   song: {
+    back: "← Tất cả bài",
     metaDescription: (title: string, artist?: string) => `Tab guitar ${title}${artist ? ` — ${artist}` : ""}`,
     tabBy: "Soạn tab bởi",
     level: "Độ khó",
@@ -113,10 +106,6 @@ const en: Dict = {
   footer: { contact: "Contact" },
   level: { "Dễ": "Easy", "Vừa": "Medium", "Khó": "Hard" },
   badge: { new: "New", free: "Free" },
-  collections: {
-    solo: "Fingerstyle, intros and solos — complete on a single guitar.",
-    melody: "The main melody of the song — easy to start, easy to play along.",
-  },
   songs: (n) => `${n} ${n === 1 ? "song" : "songs"}`,
   home: {
     updated: "Updated every week",
@@ -127,10 +116,6 @@ const en: Dict = {
     latestEyebrow: "Just added",
     latestTitle: "All tabs",
     more: (left) => `Show more (${left} left)`,
-  },
-  collection: {
-    back: "← Home",
-    request: "Can't find your song? Request it →",
   },
   browser: {
     search: "Search songs",
@@ -149,6 +134,7 @@ const en: Dict = {
     noAudio: "No songs with audio.",
   },
   song: {
+    back: "← All songs",
     metaDescription: (title, artist) => `${title}${artist ? ` by ${artist}` : ""} — guitar tab`,
     tabBy: "Tab by",
     level: "Level",
@@ -198,7 +184,6 @@ export const dict: Record<Lang, Dict> = { vi, en };
 /** Đường dẫn của từng loại trang theo ngôn ngữ */
 export const paths = {
   home: (lang: Lang) => (lang === "en" ? "/en" : "/"),
-  collection: (lang: Lang, slug: string) => (lang === "en" ? `/en/${slug}` : `/${slug}`),
   song: (lang: Lang, slug: string) => (lang === "en" ? `/en/${slug}` : `/${slug}`),
   author: (lang: Lang, id: number | string) => (lang === "en" ? `/en/author/${id}` : `/tac-gia/${id}`),
   contribute: (lang: Lang) => (lang === "en" ? "/en/contribute" : "/dong-gop"),

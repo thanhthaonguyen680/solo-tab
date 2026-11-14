@@ -1,6 +1,5 @@
 import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
-import type { CollectionSlug } from "@/config/site";
 import { loadSheetPages, rowToSong, sql, SONG_COLUMNS, type SongRow } from "./db";
 import type { Song } from "./song-model";
 
@@ -38,9 +37,9 @@ function summarize(song: Song, newest: string[]): SongSummary {
   return { ...rest, hasAudio: Boolean(audioUrl), isNew: newest.includes(rest.slug) };
 }
 
-export async function getSongs(collection?: CollectionSlug): Promise<SongSummary[]> {
+export async function getSongs(): Promise<SongSummary[]> {
   const { songs, newest } = await loadAll();
-  return songs.filter((s) => !collection || s.collection === collection).map((s) => summarize(s, newest));
+  return songs.map((s) => summarize(s, newest));
 }
 
 /**
@@ -71,8 +70,8 @@ export async function getSong(slug: string): Promise<(Song & SongSummary) | unde
   return song && { ...song, hasAudio: Boolean(song.audioUrl) };
 }
 
-export async function countSongs(collection?: CollectionSlug) {
-  return (await getSongs(collection)).length;
+export async function countSongs() {
+  return (await getSongs()).length;
 }
 
 export async function allSongSlugs() {

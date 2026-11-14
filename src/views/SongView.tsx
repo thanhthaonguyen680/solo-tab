@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AudioBadge, FreeBadge, NewBadge, Tag } from "@/components/Badges";
 import { buttonPrimary } from "@/components/buttons";
 import { TabPlayer } from "@/components/TabPlayer";
-import { collections, site } from "@/config/site";
+import { site } from "@/config/site";
 import { getNotation } from "@/data/notation";
 import { alternates, dict, paths, type Dict, type Lang } from "@/i18n";
 import { canViewSong } from "@/lib/access";
@@ -33,7 +33,6 @@ export async function SongView({ lang, slug }: { lang: Lang; slug: string }) {
   const unlocked = canViewSong(song);
   // Chỉ gửi dữ liệu nốt xuống trình duyệt khi người xem có quyền
   const notation = unlocked ? await getNotation(song) : null;
-  const collection = collections[song.collection];
 
   const meta = [
     [t.song.level, t.level[song.level]],
@@ -43,8 +42,8 @@ export async function SongView({ lang, slug }: { lang: Lang; slug: string }) {
 
   return (
     <article className={`mx-auto flex flex-col gap-6 px-4 py-10 ${song.sheet || notation ? "max-w-4xl" : "max-w-3xl"}`}>
-      <Link href={paths.collection(lang, collection.slug)} className="w-fit text-sm text-muted hover:text-text">
-        ← {site.name} {collection.title}
+      <Link href={paths.home(lang)} className="w-fit text-sm text-muted hover:text-text">
+        {t.song.back}
       </Link>
 
       <header className="flex flex-col gap-3">

@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     return [
       { source: "/bai/:slug", destination: "/:slug", permanent: true },
       { source: "/en/song/:slug", destination: "/en/:slug", permanent: true },
+      // Bỏ chia kho Solo / Melody — mọi bài nằm chung ở trang chủ
+      { source: "/:collection(solo|melody)", destination: "/", permanent: true },
+      { source: "/en/:collection(solo|melody)", destination: "/en", permanent: true },
     ];
   },
   turbopack: {

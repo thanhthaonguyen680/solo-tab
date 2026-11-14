@@ -24,13 +24,12 @@ try {
   for (const s of songs) {
     const { rowCount } = await pool.query(
       `insert into songs (slug, title, artist, collection, tags, level, key, bpm, audio_url, tab, free, added_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       values ($1, $2, $3, 'solo', $4, $5, $6, $7, $8, $9, $10, $11)
        on conflict (slug) do nothing`,
       [
         s.slug,
         s.title,
         s.artist ?? null,
-        s.collection,
         s.tags,
         s.level,
         s.key ?? null,
@@ -44,11 +43,7 @@ try {
     inserted += rowCount ?? 0;
   }
 
-  const { rows } = await pool.query(
-    "select collection, count(*)::int as n from songs group by collection order by collection",
-  );
   console.log(`✓ Thêm mới ${inserted} bài (bỏ qua ${songs.length - inserted} bài đã có)`);
-  for (const r of rows) console.log(`  ${r.collection}: ${r.n} bài`);
 } finally {
   await pool.end();
 }

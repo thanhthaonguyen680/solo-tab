@@ -7,7 +7,6 @@ export const songs: Song[] = [
     slug: "beo-dat-may-troi",
     title: "Bèo dạt mây trôi",
     artist: "Dân ca Quan họ",
-    collection: "melody",
     tags: ["Melody", "Ver. chậm"],
     addedAt: "2026-11-01",
     level: "Dễ",

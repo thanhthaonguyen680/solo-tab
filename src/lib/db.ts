@@ -1,6 +1,5 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
-import type { CollectionSlug } from "@/config/site";
 import type { Level, Sheet, Song, SongStatus } from "./song-model";
 
 const url = process.env.DATABASE_URL;
@@ -10,7 +9,7 @@ export const sql = neon(url);
 
 /** Cột trả về từ bảng songs, đổi tên sang camelCase */
 export const SONG_COLUMNS = `
-  slug, title, artist, collection, tags, level, key, bpm,
+  slug, title, artist, tags, level, key, bpm,
   audio_url as "audioUrl", tab, free, added_at::text as "addedAt", sheet_version as "sheetVersion", notation,
   status, author_id::int as "authorId", review_note as "reviewNote",
   coalesce((select u.username from users u where u.id = author_id), contributor_name) as "authorName",
@@ -20,7 +19,6 @@ export type SongRow = {
   slug: string;
   title: string;
   artist: string | null;
-  collection: CollectionSlug;
   tags: string[];
   level: Level;
   key: string | null;
@@ -43,7 +41,6 @@ export function rowToSong(r: SongRow, sheetPages: Sheet["pages"] = []): Song {
     slug: r.slug,
     title: r.title,
     artist: r.artist ?? undefined,
-    collection: r.collection,
     tags: r.tags,
     level: r.level,
     key: r.key ?? undefined,

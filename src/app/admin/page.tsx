@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { collections } from "@/config/site";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listSongsForAdmin } from "@/lib/admin-songs";
 import { logout } from "./actions";
@@ -89,7 +88,6 @@ export default async function AdminHome(props: PageProps<"/admin">) {
             <thead className="border-b-2 border-border bg-surface-2 text-xs font-bold tracking-wide uppercase">
               <tr>
                 <th className="px-4 py-3">Bài</th>
-                <th className="px-4 py-3">Kho</th>
                 <th className="px-4 py-3">Độ khó</th>
                 <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3">Ngày thêm</th>
@@ -106,7 +104,6 @@ export default async function AdminHome(props: PageProps<"/admin">) {
                     <p className="text-muted">{s.artist ?? "—"}</p>
                     {s.contributed && <p className="text-xs text-muted">Người gửi: {s.authorName ?? "khách"}</p>}
                   </td>
-                  <td className="px-4 py-3">{collections[s.collection].title}</td>
                   <td className="px-4 py-3">{s.level}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1 text-xs">

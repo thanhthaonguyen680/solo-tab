@@ -59,7 +59,6 @@ const vi = {
     name: "Người đóng góp",
     nameHint: "Tên hoặc biệt danh của bạn — hiện trên bản nhạc khi bài được đăng. Để trống nếu muốn ẩn danh.",
     namePlaceholder: "VD: Minh Anh",
-    collection: "Kho",
     level: "Độ khó",
     rights: (
       <>
@@ -131,7 +130,6 @@ const en: ContributeText = {
     name: "Contributor",
     nameHint: "Your name or nickname — shown on the sheet once the tab is published. Leave blank to stay anonymous.",
     namePlaceholder: "e.g. Alex Nguyen",
-    collection: "Collection",
     level: "Level",
     rights: (
       <>

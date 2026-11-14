@@ -1,4 +1,3 @@
-import { collections, type CollectionSlug } from "@/config/site";
 
 export const LEVELS = ["Dễ", "Vừa", "Khó"] as const;
 export type Level = (typeof LEVELS)[number];
@@ -17,7 +16,6 @@ export type Song = {
   slug: string;
   title: string;
   artist?: string;
-  collection: CollectionSlug;
   /** Các phiên bản / phần của bài: "Intro", "Ver. 2", ... */
   tags: string[];
   /** Ngày thêm bài (YYYY-MM-DD) — dùng để sắp xếp và gắn nhãn "Mới" */
@@ -104,9 +102,6 @@ export function parseSongForm(form: FormData): ParsedSong {
   if (!SLUG_PATTERN.test(slug)) errors.slug = "Chỉ dùng chữ thường không dấu, số và dấu gạch ngang";
   else if (RESERVED_SLUGS.has(slug)) errors.slug = "Đường dẫn này trùng với một trang có sẵn của site — thêm chữ khác (vd. ten-bai-tab)";
 
-  const collection = text(form, "collection");
-  if (!Object.hasOwn(collections, collection)) errors.collection = "Chọn kho bài";
-
   const level = text(form, "level");
   if (!(LEVELS as readonly string[]).includes(level)) errors.level = "Chọn độ khó";
 
@@ -144,7 +139,6 @@ export function parseSongForm(form: FormData): ParsedSong {
       slug,
       title,
       artist: text(form, "artist") || undefined,
-      collection: collection as CollectionSlug,
       tags,
       addedAt,
       level: level as Level,

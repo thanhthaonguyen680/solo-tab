@@ -2,7 +2,6 @@
 
 import { useId, useState } from "react";
 import { buttonPrimary, buttonSecondary, inputClass } from "@/app/admin/ui";
-import { collections } from "@/config/site";
 import { dict, type Lang } from "@/i18n";
 import { submitContribution } from "@/lib/contribute-actions";
 import { LEVELS } from "@/lib/song-model";
@@ -42,7 +41,6 @@ export function ContributionForm({
       title: String(form.get("title") ?? ""),
       artist: String(form.get("artist") ?? ""),
       name: String(form.get("name") ?? ""),
-      collection: String(form.get("collection") ?? ""),
       level: String(form.get("level") ?? ""),
       notation,
       tempo,
@@ -64,15 +62,6 @@ export function ContributionForm({
       </Field>
       <Field label={t.name} id={id("name")} hint={t.nameHint}>
         <input id={id("name")} name="name" maxLength={60} autoComplete="nickname" placeholder={t.namePlaceholder} className={inputClass} />
-      </Field>
-      <Field label={t.collection} id={id("collection")}>
-        <select id={id("collection")} name="collection" defaultValue="melody" className={inputClass}>
-          {Object.values(collections).map((c) => (
-            <option key={c.slug} value={c.slug}>
-              {c.title}
-            </option>
-          ))}
-        </select>
       </Field>
       <Field label={t.level} id={id("level")}>
         <select id={id("level")} name="level" defaultValue="Vừa" className={inputClass}>

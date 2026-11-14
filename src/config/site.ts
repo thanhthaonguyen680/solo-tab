@@ -21,25 +21,6 @@ export const site = {
   },
 } as const;
 
-export const collections = {
-  solo: {
-    slug: "solo",
-    title: "Solo",
-    blurb: "Fingerstyle, intro, đoạn solo — chơi một mình vẫn đầy đủ.",
-  },
-  melody: {
-    slug: "melody",
-    title: "Melody",
-    blurb: "Giai điệu chính của bài hát, dễ bắt đầu, dễ đệm cùng.",
-  },
-} as const;
-
-export type CollectionSlug = keyof typeof collections;
-
-export function isCollectionSlug(value: string): value is CollectionSlug {
-  return Object.hasOwn(collections, value);
-}
-
 export function formatVnd(amount: number) {
   return amount.toLocaleString("vi-VN") + "đ";
 }

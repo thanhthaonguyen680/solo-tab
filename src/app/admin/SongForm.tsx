@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { collections } from "@/config/site";
 import { LEVELS, slugify, type Song } from "@/lib/song-model";
 import type { SongFormState } from "./actions";
 import { buttonPrimary, buttonSecondary, FieldError, inputClass } from "./ui";
@@ -68,23 +67,6 @@ export function SongForm({ song, today, action }: Props) {
 
         <Field label="Tác giả / nguồn" name="artist" error={err.artist}>
           <input id="artist" name="artist" defaultValue={v("artist", song?.artist)} className={inputClass} />
-        </Field>
-
-        <Field label="Kho *" name="collection" error={err.collection}>
-          <select
-            id="collection"
-            name="collection"
-            required
-            defaultValue={v("collection", song?.collection ?? "solo")}
-            className={inputClass}
-            {...invalid("collection", err.collection)}
-          >
-            {Object.values(collections).map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.title}
-              </option>
-            ))}
-          </select>
         </Field>
 
         <Field label="Độ khó *" name="level" error={err.level}>
