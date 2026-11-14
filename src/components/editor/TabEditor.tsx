@@ -3,6 +3,7 @@
 import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { patchSlidePlayback } from "@/lib/alphatab-slides";
 import { applySongInfo, decodeNotation, encodeScoreFile } from "@/lib/notation-format";
 import { saveScore } from "@/lib/song-content-actions";
 import { buttonPrimary, buttonSecondary } from "@/app/admin/ui";
@@ -192,6 +193,7 @@ export function TabEditor({
       const alphaTab = await import("@coderline/alphatab");
       if (cancelled) return;
       libRef.current = alphaTab;
+      patchSlidePlayback(alphaTab); // tiếng vuốt đi từng phím, chuỗi vuốt liền chỉ gảy một lần
       const css = getComputedStyle(document.documentElement);
       const color = (n: string) => css.getPropertyValue(n).trim();
       api = new alphaTab.AlphaTabApi(host, {
@@ -211,6 +213,7 @@ export function TabEditor({
         },
         player: {
           playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
+          slide: { shiftSlideDurationRatio: 0.7 },
           soundFont: "/alphatab/soundfont/sonivox.sf2",
           enablePlaybackRangeSelection: false,
           scrollMode: alphaTab.ScrollMode.Off,

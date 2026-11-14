@@ -37,10 +37,6 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
   lines.push(`\\displaytranspose ${12 - tab.capo}`);
 
   let ts = "4 4";
-  // Dây đang có nốt vuốt legato tới (nốt đích không được gảy lại). Vuốt tiếp từ nốt đích đó thì alphaTab
-  // uốn trên một nốt không kêu → nốt cuối chuỗi bị mất. Nên trong chuỗi 7→8→10: vuốt đầu legato,
-  // các vuốt sau là vuốt gảy (shift) — nghe gần Guitar Pro nhất mà vẫn đủ mọi nốt.
-  const legatoInto = new Set<number>();
   for (const bar of tab.bars) {
     const parts: string[] = [];
     // Chỉ dấu nhịp in trên sheet (PDF Guitar Pro 8): ô ngắn hơn thì bù dấu lặng cho đủ; ô dài hơn (đọc sai
@@ -72,11 +68,8 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
           const nfx: string[] = [];
           if (letRing && !n.dead) nfx.push("lr");
           if (n.harmonic) nfx.push("nh");
-          if (n.slide) {
-            nfx.push(legatoInto.has(n.string) ? "ss" : "sl");
-            if (legatoInto.has(n.string)) legatoInto.delete(n.string);
-            else legatoInto.add(n.string);
-          } else if (!b.grace) legatoInto.delete(n.string);
+          // Vuốt legato (gảy một lần, trượt sang nốt đích) — chuỗi 7→8→10 phát được nhờ lib/alphatab-slides
+          if (n.slide) nfx.push("sl");
           const fret = n.tie ? "-" : n.dead ? "x" : String(n.fret);
           return `${fret}.${n.string}${nfx.length ? `{${nfx.join(" ")}}` : ""}`;
         });

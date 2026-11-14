@@ -3,6 +3,7 @@
 import type { AlphaTabApi, model } from "@coderline/alphatab";
 import { useEffect, useRef, useState } from "react";
 import { dict, type Lang } from "@/i18n";
+import { patchSlidePlayback } from "@/lib/alphatab-slides";
 import { applySongInfo, decodeNotation } from "@/lib/notation-format";
 
 const BPM_STEP = 4;
@@ -93,6 +94,7 @@ export function TabPlayer({
       const alphaTab = await import("@coderline/alphatab");
       if (cancelled) return;
       libRef.current = alphaTab;
+      patchSlidePlayback(alphaTab); // tiếng vuốt đi từng phím, chuỗi vuốt liền chỉ gảy một lần
       const isHorizontal =
         layoutChoice === "horizontal" || (layoutChoice === "auto" && window.matchMedia("(max-width: 640px)").matches);
       setHorizontal(isHorizontal);
@@ -121,6 +123,8 @@ export function TabPlayer({
         },
         player: {
           playerMode: audioOnRef.current ? alphaTab.PlayerMode.EnabledSynthesizer : alphaTab.PlayerMode.Disabled,
+          // Vuốt: giữ nốt 70% thời gian rồi mới trượt nhanh sang nốt đích (mặc định trượt suốt nửa sau, nghe lê thê)
+          slide: { shiftSlideDurationRatio: 0.7 },
           soundFont: "/alphatab/soundfont/sonivox.sf2",
           ...(isHorizontal && scroller
             ? {
