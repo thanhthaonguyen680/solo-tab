@@ -13,6 +13,9 @@ export function reportOf(tab: ParsedTab): TabReport {
   };
 }
 
+/** Dấu lặng bù cho đủ ô: [số phách đen, trường độ] */
+const REST_VALUES: [number, number][] = [[4, 1], [2, 2], [1, 4], [0.5, 8], [0.25, 16], [0.125, 32]];
+
 /**
  * Chuyển kết quả đọc PDF sang alphaTex cho trình phát tab.
  * Mặc định để dây ngân (let ring) — kiểu chơi chuẩn của tab fingerstyle.
@@ -33,15 +36,29 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
   // Khuông nhạc ghi theo thế bấm như sheet gốc: guitar ghi cao hơn 1 quãng tám, trừ phần capo
   lines.push(`\\displaytranspose ${12 - tab.capo}`);
 
-  let ts = 4;
+  let ts = "4 4";
+  // Dây đang có nốt vuốt legato tới (nốt đích không được gảy lại). Vuốt tiếp từ nốt đích đó thì alphaTab
+  // uốn trên một nốt không kêu → nốt cuối chuỗi bị mất. Nên trong chuỗi 7→8→10: vuốt đầu legato,
+  // các vuốt sau là vuốt gảy (shift) — nghe gần Guitar Pro nhất mà vẫn đủ mọi nốt.
+  const legatoInto = new Set<number>();
   for (const bar of tab.bars) {
     const parts: string[] = [];
-    const beats = Math.round(bar.length * 4) / 4;
-    // Ô ngắn / dài hơn 4 phách (vd. ô đệm trước đoạn mới) → đổi số chỉ nhịp cho riêng ô đó
-    const num = Number.isInteger(beats) && beats >= 1 && beats <= 7 ? beats : 4;
-    if (num !== ts) {
-      parts.push(`\\ts ${num} 4`);
-      ts = num;
+    // Chỉ dấu nhịp in trên sheet (PDF Guitar Pro 8): ô ngắn hơn thì bù dấu lặng cho đủ; ô dài hơn (đọc sai
+    // trường độ) thì vẫn mở rộng ô để không nốt nào bị chồng lên ô sau
+    const sigBeats = bar.timeSig ? (bar.timeSig[0] * 4) / bar.timeSig[1] : null;
+    let sig: string;
+    let pad = 0;
+    if (sigBeats && bar.length <= sigBeats + 0.01) {
+      sig = `${bar.timeSig![0]} ${bar.timeSig![1]}`;
+      pad = sigBeats - bar.length;
+    } else {
+      // Không biết chỉ dấu nhịp: ô ngắn / dài hơn 4 phách (vd. ô đệm trước đoạn mới) → đổi số chỉ nhịp cho riêng ô đó
+      const beats = Math.round(bar.length * 4) / 4;
+      sig = `${Number.isInteger(beats) && beats >= 1 && beats <= 7 ? beats : 4} 4`;
+    }
+    if (sig !== ts) {
+      parts.push(`\\ts ${sig}`);
+      ts = sig;
     }
     for (const b of bar.beats) {
       const fx: string[] = [];
@@ -55,13 +72,23 @@ export function toAlphaTex(tab: ParsedTab, { letRing = true } = {}): string {
           const nfx: string[] = [];
           if (letRing && !n.dead) nfx.push("lr");
           if (n.harmonic) nfx.push("nh");
-          if (n.slide) nfx.push("sl");
+          if (n.slide) {
+            nfx.push(legatoInto.has(n.string) ? "ss" : "sl");
+            if (legatoInto.has(n.string)) legatoInto.delete(n.string);
+            else legatoInto.add(n.string);
+          } else if (!b.grace) legatoInto.delete(n.string);
           const fret = n.tie ? "-" : n.dead ? "x" : String(n.fret);
           return `${fret}.${n.string}${nfx.length ? `{${nfx.join(" ")}}` : ""}`;
         });
         body = notes.length > 1 ? `(${notes.join(" ")})` : notes[0];
       }
       parts.push(`${body}.${b.dur}${fx.length ? `{${fx.join(" ")}}` : ""}`);
+    }
+    for (const [value, dur] of REST_VALUES) {
+      while (pad >= value - 1e-6) {
+        parts.push(`r.${dur}`);
+        pad -= value;
+      }
     }
     lines.push(`${parts.join(" ")} |`);
   }

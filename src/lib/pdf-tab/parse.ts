@@ -17,7 +17,15 @@ export type TabBeat = {
   /** Nốt hoa mỹ (láy) — in nhỏ, không chiếm phách */
   grace?: boolean;
 };
-export type TabBar = { page: number; beats: TabBeat[]; /** số phách đen */ length: number; warnings: string[] };
+export type TabBar = {
+  page: number;
+  beats: TabBeat[];
+  /** số phách đen */
+  length: number;
+  warnings: string[];
+  /** Chỉ dấu nhịp in trên sheet đang áp dụng cho ô này (tử, mẫu) — chỉ đọc được ở PDF Guitar Pro 8 */
+  timeSig?: [number, number];
+};
 export type ParsedTab = {
   title: string | null;
   tempo: number | null;
@@ -30,7 +38,7 @@ export type ParsedTab = {
 
 type Staff = { kind: "tab" | "std"; lines: number[]; x0: number; x1: number };
 type Kind = "beam" | "stem" | "head-open" | "head-black" | "head-whole" | "dot" | "flag1" | "flag2" | "flag3" | "rest-block" | "other";
-type Glyph = Fill & { kind: Kind; /** ký hiệu cỡ nhỏ — của nốt hoa mỹ */ small?: boolean };
+type Glyph = Fill & { kind: Kind; /** ký hiệu cỡ nhỏ — của nốt hoa mỹ */ small?: boolean; /** đầu nốt X (nốt chết) — không cho biết đen hay trắng */ dead?: boolean };
 type Column = {
   x: number;
   sx?: number;
@@ -301,9 +309,22 @@ function flattenVoices(cols: Column[], std: Staff, carried: TabNote[]): TabBeat[
   return beats;
 }
 
+/** Chỉ dấu nhịp SMuFL ở đầu ô: các chữ số tử (trên dòng giữa) / mẫu (dưới), hoặc ký hiệu C / C gạch */
+function readTimeSig(glyphs: MusicGlyph[], std: Staff, x0: number): [number, number] | null {
+  const here = glyphs.filter((m) => m.code >= 0xe080 && m.code <= 0xe08b && m.x >= x0 - 1 && m.x <= x0 + 30 && m.y >= std.lines[0] - 3 && m.y <= std.lines[4] + 3);
+  if (!here.length) return null;
+  if (here.some((m) => m.code === 0xe08a)) return [4, 4];
+  if (here.some((m) => m.code === 0xe08b)) return [2, 2];
+  const num = (list: MusicGlyph[]) => Number(list.sort((a, b) => a.x - b.x).map((m) => m.code - 0xe080).join(""));
+  const top = here.filter((m) => m.y < std.lines[2]);
+  const bottom = here.filter((m) => m.y > std.lines[2]);
+  return top.length && bottom.length ? [num(top), num(bottom)] : null;
+}
+
 export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Promise<ParsedTab> {
   const out: ParsedTab = { title: null, tempo: null, capo: 0, instrumentLabel: null, bars: [], warnings: [] };
   let prevNotes: TabNote[] = [];
+  let meter: [number, number] | undefined;
 
   for (let pn = 1; pn <= doc.numPages; pn++) {
     const g = await pageGeometry(await doc.getPage(pn), OPS);
@@ -346,7 +367,7 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
     const headSize = median(g.glyphs.filter((m) => SMUFL_KIND[m.code]?.startsWith("head")).map((m) => m.size));
     for (const m of g.glyphs) {
       const kind = SMUFL_KIND[m.code];
-      if (kind) glyphs.push({ ...smuflGlyph(m, kind), small: m.size < headSize * 0.85 });
+      if (kind) glyphs.push({ ...smuflGlyph(m, kind), small: m.size < headSize * 0.85, dead: m.code === 0xe0a9 });
       else if (SMUFL_REST[m.code]) smuflRests.push({ ...smuflGlyph(m, "other"), dur: SMUFL_REST[m.code] });
     }
 
@@ -463,10 +484,12 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
         }
         // Một đuôi mang cả đầu nốt đen lẫn đầu nốt trắng = 2 bè chung chỗ (giai điệu 1 phách + hợp âm ngân 2 phách)
         // → tách làm 2 cột cùng vị trí để mỗi phần có trường độ riêng
+        // (đầu nốt X không cho biết đen hay trắng → đi theo nốt trắng cùng đuôi)
         for (const c of [...cols]) {
-          const open = c.heads?.filter((h) => h.kind === "head-open") ?? [];
-          if (!open.length || open.length === c.heads!.length) continue;
-          c.heads = c.heads!.filter((h) => h.kind !== "head-open");
+          const open = c.heads?.filter((h) => h.kind === "head-open" || h.dead) ?? [];
+          const black = c.heads?.filter((h) => h.kind === "head-black" && !h.dead) ?? [];
+          if (!black.length || !c.heads!.some((h) => h.kind === "head-open")) continue;
+          c.heads = black;
           cols.push({ ...c, heads: open, notes: [] });
         }
         for (const c of cols) {
@@ -577,7 +600,9 @@ export async function parseGuitarProPdf(doc: PDFDocumentProxy, OPS: PdfOps): Pro
         const plain = oneLineBeats();
         const beats: TabBeat[] = merged && played(merged) >= played(plain) ? merged : plain;
         const length = beats.reduce((s, b) => s + (b.grace ? 0 : (4 / b.dur) * (b.dots ? 1.5 : 1)), 0);
-        out.bars.push({ page: pn, beats, length, warnings });
+        const sig = std ? readTimeSig(g.glyphs, std, bar.x0) : null;
+        if (sig) meter = sig;
+        out.bars.push({ page: pn, beats, length, warnings, timeSig: meter });
       }
     }
   }
