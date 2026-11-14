@@ -41,6 +41,8 @@ export function TabPlayer({
   const scrollRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<AlphaTabApi | null>(null);
+  /** Module alphaTab đã nạp — giữ lại để bật bộ phát ngay trong sự kiện bấm (không chờ import) */
+  const libRef = useRef<typeof import("@coderline/alphatab") | null>(null);
   /**
    * Kiểu hiển thị. "auto": điện thoại dùng cuộn ngang (bản nhạc trôi mượt dưới con trỏ, trang không giật),
    * màn hình lớn dùng kiểu trang. Người xem bấm nút để đổi.
@@ -67,6 +69,13 @@ export function TabPlayer({
   const [loop, setLoop] = useState(false);
   const [metronome, setMetronome] = useState(false);
   const [countIn, setCountIn] = useState(false);
+  /**
+   * Bộ phát (tổng hợp tiếng đàn + file soundfont 1,3 MB) chỉ bật khi người xem bấm Phát / bấm vào nốt lần đầu —
+   * mở trang chỉ vẽ tab, nhẹ hơn hẳn. Đã bật rồi thì giữ bật khi trình phát được tạo lại (đổi kiểu hiển thị).
+   */
+  const audioOnRef = useRef(false);
+  /** Bấm Phát lúc bộ phát còn đang tải → phát ngay khi tải xong */
+  const pendingPlayRef = useRef(false);
   /** iOS cũ (chưa có Audio Session API): phát kèm audio im lặng để tiếng không bị công tắc im lặng tắt */
   const needsSilentAudioRef = useRef(false);
   const silentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -83,6 +92,7 @@ export function TabPlayer({
     (async () => {
       const alphaTab = await import("@coderline/alphatab");
       if (cancelled) return;
+      libRef.current = alphaTab;
       const isHorizontal =
         layoutChoice === "horizontal" || (layoutChoice === "auto" && window.matchMedia("(max-width: 640px)").matches);
       setHorizontal(isHorizontal);
@@ -110,7 +120,7 @@ export function TabPlayer({
           },
         },
         player: {
-          playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
+          playerMode: audioOnRef.current ? alphaTab.PlayerMode.EnabledSynthesizer : alphaTab.PlayerMode.Disabled,
           soundFont: "/alphatab/soundfont/sonivox.sf2",
           ...(isHorizontal && scroller
             ? {
@@ -144,7 +154,8 @@ export function TabPlayer({
       });
       api.renderFinished.on(() => {
         setDrawn(true);
-        setStatus((s) => (s.kind === "loading" ? { kind: "loading", label: t.loadingSound } : s));
+        // Chưa bật bộ phát thì vẽ xong là xong; đang tải tiếng đàn thì giữ dòng báo tải
+        setStatus((s) => (s.kind === "loading" ? (audioOnRef.current ? { kind: "loading", label: t.loadingSound } : { kind: "ready" }) : s));
       });
       api.soundFontLoad.on((e) => {
         const pct = e.total ? Math.round((e.loaded / e.total) * 100) : 0;
@@ -153,6 +164,10 @@ export function TabPlayer({
       api.playerReady.on(() => {
         setPlayerReady(true);
         setStatus({ kind: "ready" });
+        if (pendingPlayRef.current) {
+          pendingPlayRef.current = false;
+          api?.playPause();
+        }
       });
       api.playerStateChanged.on((e) => {
         const isPlaying = e.state === alphaTab.synth.PlayerState.Playing;
@@ -186,9 +201,32 @@ export function TabPlayer({
     };
   }, [notation, defaultBpm, layoutChoice, t, title, artist, contributor]);
 
+  /** Bật bộ phát (lần đầu bấm Phát / bấm vào nốt) — gọi trong sự kiện bấm để iPhone cho phát tiếng */
+  function enableAudio() {
+    const api = apiRef.current;
+    const alphaTab = libRef.current;
+    if (!api || !alphaTab || audioOnRef.current) return;
+    audioOnRef.current = true;
+    setStatus({ kind: "loading", label: t.loadingSound });
+    api.settings.player.playerMode = alphaTab.PlayerMode.EnabledSynthesizer;
+    api.updateSettings(); // tạo bộ tổng hợp + bắt đầu tải soundfont
+    api.loadMidiForScore();
+    api.player?.output.activate(); // mở âm thanh ngay trong lần chạm (iPhone chặn nếu để sau)
+  }
+
   function togglePlay() {
     const api = apiRef.current;
     if (!api) return;
+    if (!audioOnRef.current || !playerReady) {
+      // Bộ phát chưa sẵn sàng: bật (nếu chưa) và phát ngay khi tải xong; bấm lần nữa lúc đang tải = huỷ
+      enableAudio();
+      pendingPlayRef.current = !pendingPlayRef.current;
+      if (needsSilentAudioRef.current) {
+        silentAudioRef.current ??= createSilentAudio();
+        silentAudioRef.current.play().catch(() => {});
+      }
+      return;
+    }
     // Gọi ngay trong sự kiện bấm (iOS chỉ cho phát âm thanh khi người dùng chạm)
     if (needsSilentAudioRef.current && !playing) {
       silentAudioRef.current ??= createSilentAudio();
@@ -239,7 +277,7 @@ export function TabPlayer({
         <button
           type="button"
           onClick={togglePlay}
-          disabled={!playerReady}
+          disabled={!drawn}
           aria-label={playing ? t.pause : t.play}
           className="glow grid size-10 place-items-center rounded-lg sm:size-11 bg-accent text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-50 disabled:shadow-none"
         >
@@ -337,7 +375,8 @@ export function TabPlayer({
             horizontal ? "overflow-x-auto overflow-y-hidden overscroll-x-contain" : "overflow-hidden"
           } ${drawn ? "" : "min-h-[300px] sm:min-h-[560px]"}`}
         >
-          <div ref={hostRef} />
+          {/* Bấm vào tab lần đầu: bắt đầu tải tiếng đàn (bấm vào nốt để phát từ chỗ đó cần bộ phát) */}
+          <div ref={hostRef} onPointerDown={enableAudio} />
         </div>
       </div>
       <p className="text-xs text-muted">{t.hint}</p>
