@@ -3,29 +3,21 @@
 import { useMemo, useState } from "react";
 import { dict, type Lang } from "@/i18n";
 import { matches } from "@/lib/search";
+import { type SongSort, sortSongs } from "@/lib/song-sort";
 import type { SongSummary } from "@/lib/songs";
 import { SongCard } from "./SongCard";
-
-type Sort = "az" | "za" | "newest";
-
-const sorters: Record<Sort, (a: SongSummary, b: SongSummary) => number> = {
-  az: (a, b) => a.title.localeCompare(b.title, "vi"),
-  za: (a, b) => b.title.localeCompare(a.title, "vi"),
-  newest: (a, b) => b.addedAt.localeCompare(a.addedAt),
-};
 
 export function SongBrowser({ songs, lang = "vi" }: { songs: SongSummary[]; lang?: Lang }) {
   const t = dict[lang].browser;
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<Sort>("az");
+  const [sort, setSort] = useState<SongSort>("az");
   const [audioOnly, setAudioOnly] = useState(false);
 
   const visible = useMemo(
     () =>
-      songs
+      sortSongs(songs, sort)
         .filter((s) => !audioOnly || s.hasAudio)
-        .filter((s) => matches(query, [s.title, s.artist, ...s.tags]))
-        .sort(sorters[sort]),
+        .filter((s) => matches(query, [s.title, s.artist, ...s.tags])),
     [songs, query, sort, audioOnly],
   );
 
@@ -58,13 +50,16 @@ export function SongBrowser({ songs, lang = "vi" }: { songs: SongSummary[]; lang
           </button>
           <select
             value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
+            onChange={(e) => setSort(e.target.value as SongSort)}
             aria-label={t.sort}
             className="h-11 rounded-lg border border-border bg-surface px-2 text-sm font-medium text-soft outline-none focus:border-accent"
           >
             <option value="az">{t.az}</option>
             <option value="za">{t.za}</option>
             <option value="newest">{t.newest}</option>
+            <option value="oldest">{t.oldest}</option>
+            <option value="easy">{t.easy}</option>
+            <option value="hard">{t.hard}</option>
           </select>
         </div>
       </div>

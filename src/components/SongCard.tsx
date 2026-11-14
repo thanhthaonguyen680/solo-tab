@@ -4,7 +4,12 @@ import { dict, paths, type Lang } from "@/i18n";
 import type { SongSummary } from "@/lib/songs";
 import { AudioBadge, FreeBadge, NewBadge, Tag } from "./Badges";
 
-const levelBars = { "Dễ": 1, "Vừa": 2, "Khó": 3 } as const;
+/** Màu nhãn độ khó: dễ xanh lá, vừa vàng, khó đỏ */
+const levelStyle = {
+  "Dễ": "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
+  "Vừa": "border-amber-400/40 bg-amber-400/10 text-amber-300",
+  "Khó": "border-rose-400/40 bg-rose-400/10 text-rose-300",
+} as const;
 
 export function SongCard({ song, lang = "vi" }: { song: SongSummary; lang?: Lang }) {
   const level = `${dict[lang].song.level}: ${dict[lang].level[song.level]}`;
@@ -33,14 +38,11 @@ export function SongCard({ song, lang = "vi" }: { song: SongSummary; lang?: Lang
         </div>
         <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-muted">
           {song.key && <span>{song.key}</span>}
-          <span className="flex items-end gap-0.5" title={level} aria-label={level}>
-            {[1, 2, 3].map((n) => (
-              <span
-                key={n}
-                className={`w-1.5 rounded-[2px] ${n <= levelBars[song.level] ? "bg-accent" : "bg-border"}`}
-                style={{ height: 4 + n * 3 }}
-              />
-            ))}
+          <span
+            title={level}
+            className={`rounded-full border px-2 py-0.5 font-sans text-xs font-semibold ${levelStyle[song.level]}`}
+          >
+            {dict[lang].level[song.level]}
           </span>
         </div>
       </div>
