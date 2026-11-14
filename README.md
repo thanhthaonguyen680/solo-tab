@@ -34,7 +34,7 @@ Kho tab guitar solo & melody tiếng Việt, cho người tự tập đàn. Mỗ
 - **Chế độ cuộn ngang:** bản nhạc trôi mượt dưới con trỏ, trang không giật khi đang phát.
 - Trên iPhone vẫn nghe được tiếng kể cả khi máy đang để chế độ im lặng.
 - Lưu ra màn hình chính như một app, có icon riêng.
-- **Song ngữ Việt / Anh:** nút **VI / EN** trên menu chuyển sang đúng trang tương ứng. Bản tiếng Anh có đường dẫn riêng (`/en`, `/en/solo`, `/en/song/<bài>`, `/en/author/<id>`), link tiếng Việt cũ giữ nguyên.
+- **Song ngữ Việt / Anh:** nút **VI / EN** trên menu chuyển sang đúng trang tương ứng. Link bài ngắn gọn: `solotab.site/<bài>` (tiếng Việt), `solotab.site/en/<bài>` (tiếng Anh); link cũ `/bai/<bài>` tự chuyển sang link mới.
 
 ## Tech stack
 

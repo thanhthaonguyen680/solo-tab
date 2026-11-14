@@ -40,7 +40,7 @@ export default async function AdminHome(props: PageProps<"/admin">) {
       {approved && (
         <p role="status" className="rounded-xl border border-accent/40 bg-fresh px-4 py-3 text-sm font-semibold text-accent-ink">
           ✓ Đã duyệt và đăng.{" "}
-          <Link href={`/bai/${approved}`} className="underline underline-offset-4">
+          <Link href={`/${approved}`} className="underline underline-offset-4">
             Xem trên site →
           </Link>
         </p>
@@ -69,7 +69,7 @@ export default async function AdminHome(props: PageProps<"/admin">) {
           {saved ? (
             <>
               ✓ Đã lưu.{" "}
-              <Link href={`/bai/${saved}`} className="underline underline-offset-4">
+              <Link href={`/${saved}`} className="underline underline-offset-4">
                 Xem trên site →
               </Link>
             </>

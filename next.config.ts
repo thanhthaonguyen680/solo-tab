@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  // Link bài cũ (/bai/ten-bai, /en/song/ten-bai) → link ngắn mới; 308 để Google cập nhật và link đã chia sẻ vẫn chạy
+  async redirects() {
+    return [
+      { source: "/bai/:slug", destination: "/:slug", permanent: true },
+      { source: "/en/song/:slug", destination: "/en/:slug", permanent: true },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

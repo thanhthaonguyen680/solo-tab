@@ -53,7 +53,7 @@ export function SongForm({ song, today, action }: Props) {
           error={err.slug}
         >
           <div className="flex items-center gap-1 font-mono text-sm">
-            <span className="text-muted">/bai/</span>
+            <span className="text-muted">solotab.site/</span>
             <input
               id="slug"
               name="slug"

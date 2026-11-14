@@ -6,7 +6,7 @@ import { collections } from "@/config/site";
 import type { Lang } from "@/i18n";
 import { sql } from "@/lib/db";
 import { isFileNotation, isValidFileNotation } from "@/lib/notation-format";
-import { LEVELS, NOTATION_MAX_CHARS, slugify } from "@/lib/song-model";
+import { LEVELS, NOTATION_MAX_CHARS, RESERVED_SLUGS, slugify } from "@/lib/song-model";
 import { refreshPublicPages } from "@/lib/song-access";
 
 /** Số bài tối đa một địa chỉ IP được đăng trong 24 giờ — chống spam khi không cần đăng nhập */
@@ -99,7 +99,9 @@ export async function submitContribution(c: Contribution, lang: Lang = "vi"): Pr
   }
 
   // Đường dẫn trùng với bài khác → thêm số: ten-bai-2, ten-bai-3…
-  const base = slugify(title).slice(0, 80).replace(/-+$/, "") || "bai";
+  const slugged = slugify(title).slice(0, 80).replace(/-+$/, "");
+  // Tên bài trùng tên một trang có sẵn (vd. "Solo") → thêm "-tab" để link bài không đè trang đó
+  const base = !slugged ? "bai-hat" : RESERVED_SLUGS.has(slugged) ? `${slugged}-tab` : slugged;
   for (let i = 1; i <= 50; i++) {
     const slug = i === 1 ? base : `${base}-${i}`;
     const rows = await sql`

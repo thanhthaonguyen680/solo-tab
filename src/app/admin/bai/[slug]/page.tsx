@@ -30,7 +30,7 @@ export default async function EditSongPage(props: PageProps<"/admin/bai/[slug]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{song.title}</h1>
-          <Link href={`/bai/${song.slug}`} className="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline">
+          <Link href={`/${song.slug}`} className="text-sm font-semibold text-accent-ink underline-offset-4 hover:underline">
             Xem trên site →
           </Link>
         </div>

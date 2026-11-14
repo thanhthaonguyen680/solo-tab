@@ -65,6 +65,12 @@ export const NOTATION_MAX_CHARS = 300_000;
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * Link bài nằm ngay sau tên miền (/ten-bai) nên không được trùng tên các trang có sẵn của site
+ * (kho bài, đóng góp, admin, trang tiếng Anh, link cũ /bai…).
+ */
+export const RESERVED_SLUGS = new Set(["solo", "melody", "en", "bai", "song", "tac-gia", "author", "dong-gop", "contribute", "goi", "admin", "api", "dang-nhap"]);
+
 /** "Bèo dạt mây trôi" → "beo-dat-may-troi" */
 export function slugify(text: string): string {
   return text
@@ -96,6 +102,7 @@ export function parseSongForm(form: FormData): ParsedSong {
 
   const slug = text(form, "slug") || slugify(title);
   if (!SLUG_PATTERN.test(slug)) errors.slug = "Chỉ dùng chữ thường không dấu, số và dấu gạch ngang";
+  else if (RESERVED_SLUGS.has(slug)) errors.slug = "Đường dẫn này trùng với một trang có sẵn của site — thêm chữ khác (vd. ten-bai-tab)";
 
   const collection = text(form, "collection");
   if (!Object.hasOwn(collections, collection)) errors.collection = "Chọn kho bài";

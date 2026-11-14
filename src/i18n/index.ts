@@ -1,6 +1,7 @@
 /**
  * Song ngữ VI / EN cho phần đọc tab của site công khai.
- * Tiếng Việt giữ link cũ (/bai/…), tiếng Anh nằm dưới /en với đường dẫn tiếng Anh (/en/song/…).
+ * Link bài ngắn gọn: /ten-bai (tiếng Việt), /en/ten-bai (tiếng Anh). Link cũ /bai/… và /en/song/… tự chuyển
+ * sang link mới (xem redirects trong next.config.ts).
  * Trang đóng góp: /dong-gop ↔ /en/contribute. Trang admin chỉ có tiếng Việt.
  * Dùng được cả ở server lẫn client component (không có gì bí mật ở đây).
  */
@@ -198,7 +199,7 @@ export const dict: Record<Lang, Dict> = { vi, en };
 export const paths = {
   home: (lang: Lang) => (lang === "en" ? "/en" : "/"),
   collection: (lang: Lang, slug: string) => (lang === "en" ? `/en/${slug}` : `/${slug}`),
-  song: (lang: Lang, slug: string) => (lang === "en" ? `/en/song/${slug}` : `/bai/${slug}`),
+  song: (lang: Lang, slug: string) => (lang === "en" ? `/en/${slug}` : `/${slug}`),
   author: (lang: Lang, id: number | string) => (lang === "en" ? `/en/author/${id}` : `/tac-gia/${id}`),
   contribute: (lang: Lang) => (lang === "en" ? "/en/contribute" : "/dong-gop"),
 };
@@ -213,18 +214,18 @@ export function counterpart(pathname: string): string {
   if (langOf(pathname) === "en") {
     const [, section, id] = parts;
     if (!section) return "/";
-    if (section === "song" && id) return paths.song("vi", id);
     if (section === "author" && id) return paths.author("vi", id);
     if (section === "contribute") return paths.contribute("vi");
-    return parts.length === 2 ? paths.collection("vi", section) : "/";
+    // /en/solo, /en/ten-bai → cùng đường dẫn bên tiếng Việt
+    return parts.length === 2 ? `/${section}` : "/";
   }
   const [section, id] = parts;
   if (!section) return "/en";
-  if (section === "bai" && id) return paths.song("en", id);
   if (section === "tac-gia" && id) return paths.author("en", id);
   if (section === "dong-gop") return paths.contribute("en");
-  if (section === "solo" || section === "melody") return paths.collection("en", section);
-  return "/en";
+  if (section === "goi" || section === "admin") return "/en";
+  // /solo, /ten-bai → /en/solo, /en/ten-bai
+  return parts.length === 1 ? `/en/${section}` : "/en";
 }
 
 /** Thẻ hreflang cho một trang có cả hai ngôn ngữ */

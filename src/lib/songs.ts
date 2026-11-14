@@ -44,7 +44,7 @@ export async function getSongs(collection?: CollectionSlug): Promise<SongSummary
 }
 
 /**
- * Một bài theo slug. Truy vấn riêng (không lọc từ loadAll) vì khung trang /bai/[slug] được
+ * Một bài theo slug. Truy vấn riêng (không lọc từ loadAll) vì khung trang /[slug] được
  * prerender lúc build: nếu dùng loadAll, danh sách lúc build bị đóng gói vào khung và bài
  * thêm sau đó sẽ báo "không tìm thấy".
  */
